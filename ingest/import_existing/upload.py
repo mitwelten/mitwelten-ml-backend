@@ -16,7 +16,6 @@ sys.path.append('../../')
 import credentials as crd
 
 CPU_THREADS = 4
-BUCKET = 'ixdm-mitwelten'
 
 dbConnectionPool = None
 storage = None
@@ -49,7 +48,7 @@ def uploadFile(item):
         target = f'{file_path}{file_name}'
 
         # upload file
-        result = storage.fput_object(BUCKET, target, source,
+        result = storage.fput_object(crd.minio.bucket, target, source,
             content_type='audio/x-wav', metadata=metadata, tags=tags)
         # update db: state = 'uploaded', action = null
         query = '''UPDATE files SET action = null, state = 'uploaded' WHERE file_id = %s'''
@@ -67,7 +66,6 @@ def uploadFile(item):
         cursor.execute(query, (file_id,))
         db.commit()
         # report
-        # progress.write(f"error occurred for file_id: {file_id}: {exc}")
         logger.error(f"error occurred for file_id: {file_id}: {exc}")
     finally:
         cursor.close()
@@ -107,9 +105,9 @@ def main():
         access_key=crd.minio.access_key,
         secret_key=crd.minio.secret_key,
     )
-    bucket_exists = storage.bucket_exists(BUCKET)
+    bucket_exists = storage.bucket_exists(crd.minio.bucket)
     if not bucket_exists:
-        raise Exception(f'Bucket {BUCKET} does not exist.')
+        raise Exception(f'Bucket {crd.minio.bucket} does not exist.')
 
     # set up logging
     logfilename = '{:%Y-%m-%d_%H-%M-%S}-{}-minio-upload.log'.format(datetime.now(), args.disk)
