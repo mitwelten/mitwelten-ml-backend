@@ -15,8 +15,6 @@ from tqdm.contrib.concurrent import thread_map
 sys.path.append('../../')
 import credentials as crd
 
-CPU_THREADS = 4
-
 dbConnectionPool = None
 storage = None
 logger = None
@@ -74,6 +72,7 @@ def uploadFile(item):
 def main():
     parser = argparse.ArgumentParser(description='Upload audiofiles defined in DB to minIO')
     parser.add_argument('--disk', help='disk name selector for files in DB', required=True)
+    parser.add_argument('--threads', help='number of threads to spawn', default=4)
     args = parser.parse_args()
 
     # file selection criteria
@@ -126,7 +125,7 @@ def main():
     dbConnectionPool.putconn(db)
 
     print(f'Starting for {len(fileset)} items.')
-    r = thread_map(uploadFile, fileset, max_workers=CPU_THREADS, ascii=True)
+    r = thread_map(uploadFile, fileset, max_workers=args.threads, ascii=True)
 
     # close connections in pool
     dbConnectionPool.closeall()
