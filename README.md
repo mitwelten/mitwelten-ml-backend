@@ -1,5 +1,16 @@
 # Mitwelten ML Backend
 
+## Pipeline Overview
+
+```mermaid
+graph TD
+  ingest(ingest: file upload)-->db(db: metadata, datasets, results)
+  ingest-->storage(storage: files)
+  storage --> inference(inference: TensorFlow)
+  db --> inference
+  inference --> db
+```
+
 ## ingest
 
 Import of assets, metadata to __db__ (PostgreSQL), files to __storage__ (minIO S3).
