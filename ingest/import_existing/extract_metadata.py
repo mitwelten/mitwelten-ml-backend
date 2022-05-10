@@ -296,7 +296,7 @@ if __name__ == '__main__':
             except PathParseError as err:
                 progress.write(err.__str__())
                 # mark the record for inspection
-                query = '''UPDATE files SET action = 'inspect', state = 'invalid path' WHERE file_id = %s'''
+                query = '''UPDATE files SET action = 'inspect', state = 'invalid path', updated_at = now() WHERE file_id = %s'''
                 #cursor.execute(query, (file_id,))
                 count += 1
                 if count % 100 == 0:
@@ -331,7 +331,8 @@ if __name__ == '__main__':
                         filter = %s,
                         source = %s,
                         rec_end_status = %s,
-                        comment = %s
+                        comment = %s,
+                        updated_at = now()
                     WHERE file_id = %s
                 '''
                 # cursor.execute(query,
@@ -360,7 +361,7 @@ if __name__ == '__main__':
                 progress.write(info.__str__())
 
             except audio_metadata.exceptions.UnsupportedFormat as err:
-                query = '''UPDATE files SET action = 'inspect', state = 'invalid format' WHERE file_id = %s'''
+                query = '''UPDATE files SET action = 'inspect', state = 'invalid format', updated_at = now() WHERE file_id = %s'''
                 #cursor.execute(query, (file_id,))
                 progress.write(f'{disk_filepath}: {err}')
 
@@ -368,7 +369,7 @@ if __name__ == '__main__':
                 if err.args[1] == 'text/plain' and re.search('config.txt', base_filename, re.IGNORECASE):
                     progress.write(f'adding config file: {filepath}')
                     query = '''UPDATE files SET
-                        action = 'rename', state = 'updated', format = 'text'
+                        action = 'rename', state = 'updated', format = 'text', updated_at = now()
                         week = %s,
                         device_id = %s,
                     WHERE file_id = %s'''
@@ -376,13 +377,13 @@ if __name__ == '__main__':
                 else:
                     if err.args[1] == 'application/zip':
                         progress.write(f'invalid format: {err.args[1]}')
-                        query = '''UPDATE files SET action = 'inspect', state = 'invalid format', format = 'zip' WHERE file_id = %s'''
+                        query = '''UPDATE files SET action = 'inspect', state = 'invalid format', format = 'zip', updated_at = now() WHERE file_id = %s'''
                     elif err.args[1] == 'empty':
                         progress.write(f'invalid format: empty file')
-                        query = '''UPDATE files SET action = 'ignore', state = 'empty audio', file_size = 0 WHERE file_id = %s'''
+                        query = '''UPDATE files SET action = 'ignore', state = 'empty audio', file_size = 0, updated_at = now() WHERE file_id = %s'''
                     else:
                         progress.write(f'invalid format: {err.args[1]}')
-                        query = '''UPDATE files SET action = 'inspect', state = 'invalid format' WHERE file_id = %s'''
+                        query = '''UPDATE files SET action = 'inspect', state = 'invalid format', updated_at = now() WHERE file_id = %s'''
                     #cursor.execute(query, (file_id,))
 
             finally:
@@ -407,7 +408,7 @@ if __name__ == '__main__':
         progress.close()
         print(f'updating {len(update_ids)} records of empty audio files to be skipped')
         execute_values(cursor, '''
-            UPDATE files SET state = 'empty audio', action = 'ignore', file_size = 0
+            UPDATE files SET state = 'empty audio', action = 'ignore', file_size = 0, updated_at = now()
             FROM (VALUES %s) AS data (file_id)
             WHERE files.file_id = data.file_id''',
         update_ids)

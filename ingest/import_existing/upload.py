@@ -49,7 +49,7 @@ def uploadFile(item):
         result = storage.fput_object(crd.minio.bucket, target, source,
             content_type='audio/x-wav', metadata=metadata, tags=tags)
         # update db: state = 'uploaded', action = null
-        query = '''UPDATE files SET action = null, state = 'uploaded' WHERE file_id = %s'''
+        query = '''UPDATE files SET action = null, state = 'uploaded', updated_at = now() WHERE file_id = %s'''
         cursor.execute(query, (file_id,))
         db.commit()
         # report
@@ -60,7 +60,7 @@ def uploadFile(item):
         # sys.exit(0)
     except BaseException as exc:
         # update db: state = 'upload_error'
-        query = '''UPDATE files SET state = 'upload_error' WHERE file_id = %s'''
+        query = '''UPDATE files SET state = 'upload_error', updated_at = now() WHERE file_id = %s'''
         cursor.execute(query, (file_id,))
         db.commit()
         # report

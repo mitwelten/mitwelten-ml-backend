@@ -549,3 +549,10 @@ group by fpath, device_id order by dev_start
 - device_ids `0863-3235` and `0863-3255` can be consolidated to `0863-3235` or `0863-3255`, __after checking that there is no sd card labelled one or the other way__!
 
 Then, delete the corresponding objects on minIO, change records in DB, and re-upload.
+
+## Add change tracking columns
+
+- Add the fields `created_at` and `updated_at` to table `mitwelten`
+- Update all records, setting both fields
+- Add `NOT NULL` constraint to both fields
+- modify `INSERT` and `UPDATE` queries everywhere

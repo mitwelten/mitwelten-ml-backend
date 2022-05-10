@@ -74,6 +74,8 @@ CREATE TABLE files
     rec_end_status varchar(32)
     class varchar(32),
     comment varchar(64),
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     PRIMARY KEY (result_id)
 );
 

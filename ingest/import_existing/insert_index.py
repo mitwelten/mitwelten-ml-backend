@@ -29,7 +29,7 @@ def main():
         password=crd.db.password
     )
     cursor = pg_server.cursor()
-    query = '''INSERT INTO files(original_file_path, disk) VALUES %s'''
+    query = '''INSERT INTO files(original_file_path, disk, created_at, updated_at) VALUES %s'''
     count = 0
     data = []
     with open(args.indexfile[0], 'r') as filelist:
@@ -40,11 +40,11 @@ def main():
             count += 1
             if count % 1000 == 0:
                 print(f'count: {count}, committing 1000 records')
-                execute_values(cursor, query, data, template='(%s, %s)', page_size=100)
+                execute_values(cursor, query, data, template='(%s, %s, now(), now())', page_size=100)
                 pg_server.commit()
                 data = []
     print(f'count: {count}, committing remaining records')
-    execute_values(cursor, query, data, template=None, page_size=100)
+    execute_values(cursor, query, data, template='(%s, %s, now(), now())', page_size=100)
     pg_server.commit()
     cursor.close()
     pg_server.close()
