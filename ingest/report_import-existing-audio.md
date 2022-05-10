@@ -543,12 +543,33 @@ from files where time_start > timestamptz '2000-01-05 02:19:24+01' and format = 
 select substring(original_file_path from '(.+)/[^/]+') as fpath, min(time_start) as dev_start, max(time_start) as dev_end, device_id
 from files where device_id = '4258-6870' or device_id = '4285-6870'
 group by fpath, device_id order by dev_start
+
+select device_id, count(file_name), pg_size_pretty(sum(file_size::numeric))
+from files where state = 'uploaded' and device_id ~ '42(85|58)-6870' group by device_id
+
+select device_id, count(file_name), pg_size_pretty(sum(file_size::numeric))
+from files where state = 'uploaded' and device_id ~ '0863-32[35]5' group by device_id
 ```
 
-- device_ids `4258-6870` and `4285-6870` can be consolidated to `4258-6870`, __after checking that there is no sd card labelled `4285-6870`__!
+- device_ids `4258-6870` and `4285-6870` can be consolidated to `4258-6870`
 - device_ids `0863-3235` and `0863-3255` can be consolidated to `0863-3235` or `0863-3255`, __after checking that there is no sd card labelled one or the other way__!
 
-Then, delete the corresponding objects on minIO, change records in DB, and re-upload.
+### Rename `4285-6870` to `4258-6870`
+
+- delete from minio storage: `4285-6870`
+- change `device_id` to `4258-6870`
+- recreated `file_name` and `file_path`
+- upload to minio storage
+
+```sql
+update files set device_id = '4258-6870', update_at = now(), action = 'reupload' where device_id = '4285-6870';
+update files
+set
+  file_name = device_id||'_'||to_char(time_start at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||'.wav',
+  file_path = device_id||'/'||to_char(time_start at time zone 'UTC', 'YYYY-mm-DD/HH24/'),
+  updated_at = now()
+where action = 'reupload'
+```
 
 ## Add change tracking columns
 
