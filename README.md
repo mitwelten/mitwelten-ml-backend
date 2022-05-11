@@ -23,6 +23,10 @@ Import of assets, metadata to __db__ (PostgreSQL), files to __storage__ (minIO S
 The import of existing audio data is documented in the [import-existing-audio report](./ingest/report_import-existing-audio.md).
 The accompanying code is found in [ingest/import_existing/](./ingest/import_existing/). Further development will be based on this code.
 
+### audio uploader app
+
+To upload audiofiles recorded by Audiomoths, you can use the [mitwelten-audio-uploader app](/ingest/uploader/).
+
 ## database
 
 - __files__ (metadata)
