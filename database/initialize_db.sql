@@ -82,6 +82,7 @@ CREATE TABLE files
 CREATE TABLE public.results
 (
     result_id serial,
+    selection_id bigint NOT NULL,
     file_id bigint NOT NULL,
     object_name text NOT NULL,
     time_start real NOT NULL,
@@ -104,4 +105,4 @@ GRANT UPDATE ON SEQUENCE public.files_file_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.results_result_id_seq TO mitwelten_internal;
 
 GRANT SELECT ON TABLE public.files TO mitwelten_public;
-GRANT SELECT ON TABLE public.results TO ubicomp_public;
+GRANT SELECT ON TABLE public.results TO mitwelten_public;
