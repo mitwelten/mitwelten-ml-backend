@@ -15,10 +15,10 @@ import numpy as np
 sys.path.append('birdnet')
 import config as cfg
 import model
-import lib.audio as audio
 
 sys.path.append('../')
 import credentials as crd
+import lib.audio as audio
 
 # for now, use manual id.
 # don't forget to change it between datasets
