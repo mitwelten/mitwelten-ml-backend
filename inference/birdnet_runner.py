@@ -8,11 +8,22 @@ import traceback
 
 from multiprocessing import Pool, freeze_support
 
+import psycopg2 as pg
+from psycopg2.extras import execute_values
 import numpy as np
 
+sys.path.append('birdnet')
 import config as cfg
-import audio
 import model
+import lib.audio as audio
+
+sys.path.append('../')
+import credentials as crd
+
+# for now, use manual id.
+# don't forget to change it between datasets
+# another option: int(datetime.datetime.now().timestamp())
+SELECTION_ID = 3
 
 def clearErrorLog():
 
@@ -24,22 +35,66 @@ def writeErrorLog(msg):
     with open(cfg.ERROR_LOG_FILE, 'a') as elog:
         elog.write(msg + '\n')
 
-def parseInputFiles(path, allowed_filetypes=['wav', 'flac', 'mp3', 'ogg', 'm4a']):
+def loadFileSet():
 
-    # Add backslash to path if not present
-    if not path.endswith(os.sep):
-        path += os.sep
+    # SELECTION_ID 1
+    fileset_query = '''
+    select file_id, file_path
+    from input_files
+    where device_id = '6444-8804'
+    order by time_start asc
+    '''
 
-    # Get all files in directory with os.walk
-    files = []
-    for root, dirs, flist in os.walk(path):
-        for f in flist:
-            if len(f.rsplit('.', 1)) > 1 and f.rsplit('.', 1)[1].lower() in allowed_filetypes:
-                files.append(os.path.join(root, f))
+    # SELECTION_ID 2
+    fileset_query = '''
+    select file_id, file_path
+    from input_files
+    where device_id = '4258-6870' and duration >= 3
+    order by time_start asc
+    '''
 
-    print('Found {} files to analyze'.format(len(files)))
+    # SELECTION_ID 3
+    fileset_query = '''
+    select file_id, file_path
+    from input_files
+    where device_id ~ 'AM[12]' and duration >= 3
+    order by time_start asc
+    '''
 
-    return sorted(files)
+    # SELECTION_ID 3a (with less threads, fixing the out of memory tasks)
+    fileset_query = '''
+    select file_id, file_path
+    from input_files
+    where device_id ~ 'AM[12]' and duration >= 3 and not exists (
+        select from results where object_name = file_path
+    )
+    order by time_start asc
+    '''
+
+    # SELECTION_ID 3b (less threads, only files smaller than 1100MB)
+    fileset_query = '''
+    select file_id, file_path
+    from input_files
+    where device_id ~ 'AM[12]' and duration >= 3 and not exists (
+        select from results where object_name = file_path
+    ) and file_size < 1153433600
+    order by file_size desc
+    '''
+
+    pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+    cursor = pg_server.cursor()
+
+    cursor.execute(fileset_query)
+    fileset = cursor.fetchall()
+    files_count = len(fileset)
+
+    cursor.close()
+    pg_server.close()
+
+    print(f'Found {files_count} files to analyze')
+
+    # [(file_id, object_name)]
+    return fileset
 
 def loadCodes():
 
@@ -53,7 +108,7 @@ def loadLabels(labels_file):
     labels = []
     with open(labels_file, 'r') as lfile:
         for line in lfile.readlines():
-            labels.append(line.replace('\n', ''))    
+            labels.append(line.replace('\n', ''))
 
     return labels
 
@@ -77,6 +132,36 @@ def predictSpeciesList():
         if s[0] >= cfg.LOCATION_FILTER_THRESHOLD:
             cfg.SPECIES_LIST.append(s[1])
 
+def saveResultsToDb(f_id, object_name, r):
+    insert_query = '''
+    insert into
+    results(file_id, object_name, time_start, time_end, confidence, species, selection_id)
+    values %s
+    '''
+
+    pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+    cursor = pg_server.cursor()
+
+    data = []
+    for timestamp in sorted(r):
+        for c in r[timestamp]:
+            start, end = timestamp.split('-')
+            if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):
+                label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
+                data.append((
+                    f_id,
+                    object_name,
+                    float(start),
+                    float(end),
+                    float(c[1]),
+                    label.split('_')[0],
+                    SELECTION_ID))
+
+    execute_values(cursor, insert_query, data, template=None, page_size=100)
+    pg_server.commit()
+    cursor.close()
+    pg_server.close()
+
 def saveResultFile(r, path, afile_path):
 
     # Make folder if it doesn't exist
@@ -94,7 +179,7 @@ def saveResultFile(r, path, afile_path):
 
         # Write header
         out_string += header
-        
+
         # Extract valid predictions for every timestamp
         for timestamp in getSortedTimestamps(r):
             rstring = ''
@@ -104,13 +189,13 @@ def saveResultFile(r, path, afile_path):
                     selection_id += 1
                     label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
                     rstring += '{}\tSpectrogram 1\t1\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4f}\n'.format(
-                        selection_id, 
-                        start, 
-                        end, 
-                        150, 
-                        12000, 
-                        cfg.CODES[c[0]], 
-                        label.split('_')[1], 
+                        selection_id,
+                        start,
+                        end,
+                        150,
+                        12000,
+                        cfg.CODES[c[0]],
+                        label.split('_')[1],
                         c[1])
 
             # Write result string to file
@@ -126,8 +211,8 @@ def saveResultFile(r, path, afile_path):
                 if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):
                     label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
                     rstring += '{}\t{}\t{:.4f}\n'.format(
-                        timestamp.replace('-', '\t'), 
-                        label.replace('_', ', '), 
+                        timestamp.replace('-', '\t'),
+                        label.replace('_', ', '),
                         c[1])
 
             # Write result string to file
@@ -144,7 +229,7 @@ def saveResultFile(r, path, afile_path):
             rstring = ''
             start, end = timestamp.split('-')
             for c in r[timestamp]:
-                if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):                    
+                if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):
                     label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
                     rstring += '\n{},{},{},{},{},{:.4f},{:.4f},{:.4f},{},{},{},{},{},{}'.format(
                         afile_path,
@@ -176,7 +261,7 @@ def saveResultFile(r, path, afile_path):
 
         for timestamp in getSortedTimestamps(r):
             rstring = ''
-            for c in r[timestamp]:                
+            for c in r[timestamp]:
                 start, end = timestamp.split('-')
                 if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):
                     label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
@@ -227,19 +312,20 @@ def analyzeFile(item):
     # Get file path and restore cfg
     fpath = item[0]
     cfg.setConfig(item[1])
+    f_id = item[2]
 
     # Start time
     start_time = datetime.datetime.now()
 
     # Status
-    print('Analyzing {}'.format(fpath), flush=True)
+    print(f'Analyzing {fpath}', flush=True)
 
     # Open audio file and split into 3-second chunks
     chunks = getRawAudioFromFile(fpath)
 
     # If no chunks, show error and skip
     if len(chunks) == 0:
-        msg = 'Error: Cannot open audio file {}'.format(fpath)
+        msg = f'Error: Cannot open audio file {fpath}'
         print(msg, flush=True)
         writeErrorLog(msg)
         return False
@@ -260,7 +346,7 @@ def analyzeFile(item):
             start += cfg.SIG_LENGTH - cfg.SIG_OVERLAP
             end = start + cfg.SIG_LENGTH
 
-            # Check if batch is full or last chunk        
+            # Check if batch is full or last chunk
             if len(samples) < cfg.BATCH_SIZE and c < len(chunks) - 1:
                 continue
 
@@ -287,49 +373,52 @@ def analyzeFile(item):
 
             # Clear batch
             samples = []
-            timestamps = []  
+            timestamps = []
     except:
         # Print traceback
         print(traceback.format_exc(), flush=True)
 
         # Write error log
-        msg = 'Error: Cannot analyze audio file {}.\n{}'.format(fpath, traceback.format_exc())
+        msg = f'Error: Cannot analyze audio file {fpath}.\n{traceback.format_exc()}'
         print(msg, flush=True)
         writeErrorLog(msg)
-        return False     
+        return False
 
     # Save as selection table
     try:
+        # store results in database
+        saveResultsToDb(f_id, fpath, results)
 
         # Make directory if it doesn't exist
         if len(os.path.dirname(cfg.OUTPUT_PATH)) > 0 and not os.path.exists(os.path.dirname(cfg.OUTPUT_PATH)):
-            os.makedirs(os.path.dirname(cfg.OUTPUT_PATH), exist_ok=True)
+            os.makedirs(os.path.dirname(cfg.OUTPUT_PATH))
 
         if os.path.isdir(cfg.OUTPUT_PATH):
-            rpath = fpath.replace(cfg.INPUT_PATH, '')
+            rpath = fpath
             rpath = rpath[1:] if rpath[0] in ['/', '\\'] else rpath
             if cfg.RESULT_TYPE == 'table':
-                rtype = '.BirdNET.selection.table.txt' 
+                rtype = '.BirdNET.selection.table.txt'
             elif cfg.RESULT_TYPE == 'audacity':
                 rtype = '.BirdNET.results.txt'
             else:
                 rtype = '.BirdNET.results.csv'
             saveResultFile(results, os.path.join(cfg.OUTPUT_PATH, rpath.rsplit('.', 1)[0] + rtype), fpath)
         else:
-            saveResultFile(results, cfg.OUTPUT_PATH, fpath)        
+            saveResultFile(results, cfg.OUTPUT_PATH, fpath)
+
     except:
 
         # Print traceback
         print(traceback.format_exc(), flush=True)
 
         # Write error log
-        msg = 'Error: Cannot save result for {}.\n{}'.format(fpath, traceback.format_exc())
+        msg = f'Error: Cannot save result for {fpath}.\n{traceback.format_exc()}'
         print(msg, flush=True)
         writeErrorLog(msg)
         return False
 
     delta_time = (datetime.datetime.now() - start_time).total_seconds()
-    print('Finished {} in {:.2f} seconds'.format(fpath, delta_time), flush=True)
+    print(f'Finished {fpath} in {delta_time:.2f} seconds', flush=True)
 
     return True
 
@@ -343,7 +432,6 @@ if __name__ == '__main__':
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Analyze audio files with BirdNET')
-    parser.add_argument('--i', default='example/', help='Path to input file or folder. If this is a file, --o needs to be a file too.')
     parser.add_argument('--o', default='example/', help='Path to output file or folder. If this is a file, --i needs to be a file too.')
     parser.add_argument('--lat', type=float, default=-1, help='Recording location latitude. Set -1 to ignore.')
     parser.add_argument('--lon', type=float, default=-1, help='Recording location longitude. Set -1 to ignore.')
@@ -361,11 +449,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Set paths relative to script path (requested in #3)
-    cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.MODEL_PATH)
-    cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.LABELS_FILE)
-    cfg.TRANSLATED_LABELS_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.TRANSLATED_LABELS_PATH)
-    cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.MDATA_MODEL_PATH)
-    cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.CODES_FILE)
+    cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet',cfg.MODEL_PATH)
+    cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.LABELS_FILE)
+    cfg.TRANSLATED_LABELS_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.TRANSLATED_LABELS_PATH)
+    cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.MDATA_MODEL_PATH)
+    cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
+
     cfg.ERROR_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), cfg.ERROR_LOG_FILE)
 
     # Load eBird codes, labels
@@ -377,7 +466,7 @@ if __name__ == '__main__':
     if not args.locale in ['en'] and os.path.isfile(lfile):
         cfg.TRANSLATED_LABELS = loadLabels(lfile)
     else:
-        cfg.TRANSLATED_LABELS = cfg.LABELS   
+        cfg.TRANSLATED_LABELS = cfg.LABELS
 
     ### Make sure to comment out appropriately if you are not using args. ###
 
@@ -396,18 +485,14 @@ if __name__ == '__main__':
         predictSpeciesList()
     if len(cfg.SPECIES_LIST) == 0:
         print('Species list contains {} species'.format(len(cfg.LABELS)))
-    else:        
+    else:
         print('Species list contains {} species'.format(len(cfg.SPECIES_LIST)))
 
-    # Set input and output path    
-    cfg.INPUT_PATH = args.i
+    # Set output path
     cfg.OUTPUT_PATH = args.o
 
     # Parse input files
-    if os.path.isdir(cfg.INPUT_PATH):
-        cfg.FILE_LIST = parseInputFiles(cfg.INPUT_PATH)  
-    else:
-        cfg.FILE_LIST = [cfg.INPUT_PATH]
+    cfg.FILE_LIST = loadFileSet()
 
     # Set confidence threshold
     cfg.MIN_CONFIDENCE = max(0.01, min(0.99, float(args.min_conf)))
@@ -419,17 +504,13 @@ if __name__ == '__main__':
     cfg.SIG_OVERLAP = max(0.0, min(2.9, float(args.overlap)))
 
     # Set result type
-    cfg.RESULT_TYPE = args.rtype.lower()    
+    cfg.RESULT_TYPE = args.rtype.lower()
     if not cfg.RESULT_TYPE in ['table', 'audacity', 'r', 'csv']:
         cfg.RESULT_TYPE = 'table'
 
     # Set number of threads
-    if os.path.isdir(cfg.INPUT_PATH):
-        cfg.CPU_THREADS = max(1, int(args.threads))
-        cfg.TFLITE_THREADS = 1
-    else:
-        cfg.CPU_THREADS = 1
-        cfg.TFLITE_THREADS = max(1, int(args.threads))
+    cfg.CPU_THREADS = max(1, int(args.threads))
+    cfg.TFLITE_THREADS = 1
 
     # Set batch size
     cfg.BATCH_SIZE = max(1, int(args.batchsize))
@@ -439,20 +520,13 @@ if __name__ == '__main__':
     # support fork() and thus each process has to
     # have its own config. USE LINUX!
     flist = []
-    for f in cfg.FILE_LIST:
-        flist.append((f, cfg.getConfig()))
+    for f_id, f in cfg.FILE_LIST:
+        flist.append((f, cfg.getConfig(), f_id))
 
-    # Analyze files   
+    # Analyze files
     if cfg.CPU_THREADS < 2:
         for entry in flist:
             analyzeFile(entry)
     else:
         with Pool(cfg.CPU_THREADS) as p:
             p.map(analyzeFile, flist)
-
-
-    # A few examples to test
-    # python3 analyze.py --i example/ --o example/ --slist example/ --min_conf 0.5 --threads 4
-    # python3 analyze.py --i example/soundscape.wav --o example/soundscape.BirdNET.selection.table.txt --slist example/species_list.txt --threads 8
-    # python3 analyze.py --i example/ --o example/ --lat 42.5 --lon -76.45 --week 4 --sensitivity 1.0 --rtype table --locale de
-    
