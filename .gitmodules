@@ -1,3 +1,4 @@
 [submodule "inference/birdnet"]
 	path = inference/birdnet
 	url = https://github.com/kahst/BirdNET-Analyzer.git
+	shallow = true

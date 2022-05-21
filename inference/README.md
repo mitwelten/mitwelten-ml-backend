@@ -5,7 +5,7 @@
 ### Setup
 
 ```bash
-git submodule update --init # clone BirdNET
+git submodule update --init --depth 1 # clone BirdNET
 sudo apt-get install ffmpeg
 sudo pip install tensorflow librosa minio psycopg2
 ```
