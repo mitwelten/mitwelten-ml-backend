@@ -23,7 +23,7 @@ import lib.audio as audio
 # for now, use manual id.
 # don't forget to change it between datasets
 # another option: int(datetime.datetime.now().timestamp())
-SELECTION_ID = 3
+SELECTION_ID = 5
 
 def clearErrorLog():
 
@@ -81,6 +81,33 @@ def loadFileSet():
     order by file_size desc
     '''
 
+    # SELECTION_ID 4 / and 5 (to compare impact of week filter)
+    fileset_query = '''
+    select file_id, file_path,
+        floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    from input_files
+    where device_id = '3704-8490' and duration >= 3 and file_size < 1153433600
+    order by time_start asc
+    '''
+
+    # SELECT_ID 6
+    # a.k.a. the ultimate birdnet query
+    # all files that:
+    # - don't show up in results
+    # - sampling rate == 48kHz
+    # - duration >= 3s
+    # - filesize < 1100MB
+
+    # fileset_query = '''
+    # select count(*)
+    #     file_id, file_path,
+    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    # from input_files
+    # where sample_rate = 48000 and duration >= 3 and not exists (
+    #     select from results where object_name = file_path
+    # ) and file_size < 1153433600
+    # '''
+
     pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = pg_server.cursor()
 
@@ -131,6 +158,14 @@ def predictSpeciesList():
     for s in l_filter:
         if s[0] >= cfg.LOCATION_FILTER_THRESHOLD:
             cfg.SPECIES_LIST.append(s[1])
+
+def predictSpeciesLists():
+
+    species_lists = []
+    for w in range(1, 49):
+        l_filter = model.explore(cfg.LATITUDE, cfg.LONGITUDE, w)
+        species_lists.append([s[1] for s in l_filter if s[0] >= cfg.LOCATION_FILTER_THRESHOLD])
+    return species_lists
 
 def saveResultsToDb(f_id, object_name, r):
     insert_query = '''
@@ -433,10 +468,10 @@ if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Analyze audio files with BirdNET')
     parser.add_argument('--o', default='results/', help='Path to output folder.')
-    parser.add_argument('--lat', type=float, default=-1, help='Recording location latitude. Set -1 to ignore.')
-    parser.add_argument('--lon', type=float, default=-1, help='Recording location longitude. Set -1 to ignore.')
-    parser.add_argument('--week', type=int, default=-1, help='Week of the year when the recording was made. Values in [1, 48] (4 weeks per month). Set -1 for year-round species list.')
-    parser.add_argument('--slist', default='', help='Path to species list file or folder. If folder is provided, species list needs to be named \"species_list.txt\". If lat and lon are provided, this list will be ignored.')
+    parser.add_argument('--lat', type=float, required=True, help='Recording location latitude.')
+    parser.add_argument('--lon', type=float, required=True, help='Recording location longitude.')
+    # parser.add_argument('--week', type=int, default=-1, help='Week of the year when the recording was made. Values in [1, 48] (4 weeks per month). Set -1 for year-round species list.')
+    # parser.add_argument('--slist', default='', help='Path to species list file or folder. If folder is provided, species list needs to be named \"species_list.txt\". If lat and lon are provided, this list will be ignored.')
     parser.add_argument('--sensitivity', type=float, default=1.0, help='Detection sensitivity; Higher values result in higher sensitivity. Values in [0.5, 1.5]. Defaults to 1.0.')
     parser.add_argument('--min_conf', type=float, default=0.1, help='Minimum confidence threshold. Values in [0.01, 0.99]. Defaults to 0.1.')
     parser.add_argument('--overlap', type=float, default=0.0, help='Overlap of prediction segments. Values in [0.0, 2.9]. Defaults to 0.0.')
@@ -471,22 +506,10 @@ if __name__ == '__main__':
     ### Make sure to comment out appropriately if you are not using args. ###
 
     # Load species list from location filter or provided list
-    cfg.LATITUDE, cfg.LONGITUDE, cfg.WEEK = args.lat, args.lon, args.week
+    cfg.LATITUDE, cfg.LONGITUDE = args.lat, args.lon
     cfg.LOCATION_FILTER_THRESHOLD = max(0.01, min(0.99, float(args.sf_thresh)))
-    if cfg.LATITUDE == -1 and cfg.LONGITUDE == -1:
-        if len(args.slist) == 0:
-            cfg.SPECIES_LIST_FILE = None
-        else:
-            cfg.SPECIES_LIST_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), args.slist)
-            if os.path.isdir(cfg.SPECIES_LIST_FILE):
-                cfg.SPECIES_LIST_FILE = os.path.join(cfg.SPECIES_LIST_FILE, 'species_list.txt')
-        cfg.SPECIES_LIST = loadSpeciesList(cfg.SPECIES_LIST_FILE)
-    else:
-        predictSpeciesList()
-    if len(cfg.SPECIES_LIST) == 0:
-        print('Species list contains {} species'.format(len(cfg.LABELS)))
-    else:
-        print('Species list contains {} species'.format(len(cfg.SPECIES_LIST)))
+
+    species_lists = predictSpeciesLists()
 
     # Set output path
     cfg.OUTPUT_PATH = args.o
@@ -520,7 +543,9 @@ if __name__ == '__main__':
     # support fork() and thus each process has to
     # have its own config. USE LINUX!
     flist = []
-    for f_id, f in cfg.FILE_LIST:
+    for f_id, f, week in cfg.FILE_LIST:
+        cfg.WEEK = week
+        cfg.SPECIES_LIST = species_lists[week-1]
         flist.append((f, cfg.getConfig(), f_id))
 
     # Analyze files

@@ -30,6 +30,21 @@ For now, these selections or runs are identified by a manually set ID (`SELECTIO
 The results are stored in the DB, table `results` (see [Looking at results](#looking-at-results)).
 If not configured differently (by specifying `--o`), [`birdnet_runner.py`](./birdnet_runner.py) will store result files in `results/`, in the format specified in `--rtype`.
 
+### Species List
+
+Species lists are estimated based on location and week number as $w[1, 48]$.
+The day of year can be mapped onto this type of week number as follows:
+
+$$
+w = 1 + \left\lfloor \frac {48 (d - 1)}{365} \right\rfloor
+$$
+
+```sql
+select *,
+  floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+from input_files
+```
+
 ### Issues with file size
 
 Files larger than 1.5 GB cause the analysis process to run out of memory and crash.
