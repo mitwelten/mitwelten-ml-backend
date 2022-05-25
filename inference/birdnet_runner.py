@@ -5,11 +5,14 @@ import operator
 import argparse
 import datetime
 import traceback
+import tempfile
 
 from multiprocessing import Pool, freeze_support
 
 import psycopg2 as pg
 from psycopg2.extras import execute_values
+from minio import Minio
+import soundfile as sf
 import numpy as np
 
 sys.path.append('birdnet')
@@ -23,7 +26,7 @@ import lib.audio as audio
 # for now, use manual id.
 # don't forget to change it between datasets
 # another option: int(datetime.datetime.now().timestamp())
-SELECTION_ID = 5
+SELECTION_ID = 6
 
 def clearErrorLog():
 
@@ -107,6 +110,12 @@ def loadFileSet():
     #     select from results where object_name = file_path
     # ) and file_size < 1153433600
     # '''
+
+    fileset_query = '''
+    select file_id, file_path, floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    from input_files
+    where sample_rate = 48000 and duration >= 3 and file_size >= 1153433600
+    '''
 
     pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = pg_server.cursor()
@@ -198,6 +207,10 @@ def saveResultsToDb(f_id, object_name, r):
     pg_server.close()
 
 def saveResultFile(r, path, afile_path):
+
+    # Problems with writing results in chunks:
+    # - headers are repeated (not in audacity)
+    # - in type 'table', the selection_id repeats
 
     # Make folder if it doesn't exist
     if len(os.path.dirname(path)) > 0 and not os.path.exists(os.path.dirname(path)):
@@ -311,8 +324,8 @@ def saveResultFile(r, path, afile_path):
             if len(rstring) > 0:
                 out_string += rstring
 
-    # Save as file
-    with open(path, 'w') as rfile:
+    # Save as file, appending to existing data
+    with open(path, 'a') as rfile:
         rfile.write(out_string)
 
 
@@ -330,6 +343,22 @@ def getRawAudioFromFile(fpath):
 
     return chunks
 
+def removeResultsFile(fpath):
+    if os.path.isdir(cfg.OUTPUT_PATH):
+        rpath = fpath
+        rpath = rpath[1:] if rpath[0] in ['/', '\\'] else rpath
+        if cfg.RESULT_TYPE == 'table':
+            rtype = '.BirdNET.selection.table.txt'
+        elif cfg.RESULT_TYPE == 'audacity':
+            rtype = '.BirdNET.results.txt'
+        else:
+            rtype = '.BirdNET.results.csv'
+        rfpath = os.path.join(cfg.OUTPUT_PATH, rpath.rsplit('.', 1)[0] + rtype)
+        if os.path.exists(rfpath):
+            print(f'removing existing result file: {rfpath}')
+            os.remove(rfpath)
+            os.removedirs(os.path.dirname(rfpath))
+
 def predict(samples):
 
     # Prepare sample and pass through model
@@ -342,87 +371,13 @@ def predict(samples):
 
     return prediction
 
-def analyzeFile(item):
+def storeResults(f_id, fpath, results):
 
-    # Get file path and restore cfg
-    fpath = item[0]
-    cfg.setConfig(item[1])
-    f_id = item[2]
-
-    # Start time
-    start_time = datetime.datetime.now()
-
-    # Status
-    print(f'Analyzing {fpath}', flush=True)
-
-    # Open audio file and split into 3-second chunks
-    chunks = getRawAudioFromFile(fpath)
-
-    # If no chunks, show error and skip
-    if len(chunks) == 0:
-        msg = f'Error: Cannot open audio file {fpath}'
-        print(msg, flush=True)
-        writeErrorLog(msg)
-        return False
-
-    # Process each chunk
-    try:
-        start, end = 0, cfg.SIG_LENGTH
-        results = {}
-        samples = []
-        timestamps = []
-        for c in range(len(chunks)):
-
-            # Add to batch
-            samples.append(chunks[c])
-            timestamps.append([start, end])
-
-            # Advance start and end
-            start += cfg.SIG_LENGTH - cfg.SIG_OVERLAP
-            end = start + cfg.SIG_LENGTH
-
-            # Check if batch is full or last chunk
-            if len(samples) < cfg.BATCH_SIZE and c < len(chunks) - 1:
-                continue
-
-            # Predict
-            p = predict(samples)
-
-            # Add to results
-            for i in range(len(samples)):
-
-                # Get timestamp
-                s_start, s_end = timestamps[i]
-
-                # Get prediction
-                pred = p[i]
-
-                # Assign scores to labels
-                p_labels = dict(zip(cfg.LABELS, pred))
-
-                # Sort by score
-                p_sorted =  sorted(p_labels.items(), key=operator.itemgetter(1), reverse=True)
-
-                # Store top 5 results and advance indicies
-                results[str(s_start) + '-' + str(s_end)] = p_sorted
-
-            # Clear batch
-            samples = []
-            timestamps = []
-    except:
-        # Print traceback
-        print(traceback.format_exc(), flush=True)
-
-        # Write error log
-        msg = f'Error: Cannot analyze audio file {fpath}.\n{traceback.format_exc()}'
-        print(msg, flush=True)
-        writeErrorLog(msg)
-        return False
-
-    # Save as selection table
     try:
         # store results in database
         saveResultsToDb(f_id, fpath, results)
+
+        # store results to file
 
         # Make directory if it doesn't exist
         if len(os.path.dirname(cfg.OUTPUT_PATH)) > 0 and not os.path.exists(os.path.dirname(cfg.OUTPUT_PATH)):
@@ -451,6 +406,127 @@ def analyzeFile(item):
         print(msg, flush=True)
         writeErrorLog(msg)
         return False
+    else:
+        return True
+
+def analyzeFile(item):
+
+    # Get file path and restore cfg
+    fpath = item[0]
+    cfg.setConfig(item[1])
+    f_id = item[2]
+
+    # Start time
+    start_time = datetime.datetime.now()
+
+    # Status
+    print(f'Analyzing {fpath}', flush=True)
+
+    # Remove exsting result file
+    removeResultsFile(fpath)
+
+    temp_dir = tempfile.TemporaryDirectory() # close this in finally
+    file = None
+
+    # Read blocks of audio from file and process
+    try:
+        start, end = 0, cfg.SIG_LENGTH
+        results = {}
+        samples = []
+        timestamps = []
+
+        client = Minio(
+            crd.minio.host,
+            access_key=crd.minio.access_key,
+            secret_key=crd.minio.secret_key,
+        )
+
+        # download file to temporary directory
+        tmppath = os.path.join(temp_dir.name, os.path.basename(fpath))
+        # TODO: if file < 15min: load it directly with client.get_object(crd.minio.bucket, fpath)
+        # TODO: if samplerate != cfg.SAMPLE_RATE: resample
+        client.fget_object(crd.minio.bucket, fpath, tmppath)
+        file = sf.SoundFile(tmppath)
+
+        window_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
+        overlap_seek = int(-cfg.SIG_OVERLAP * cfg.SAMPLE_RATE)
+        last_block = False
+        block_count = 0
+
+        while file.tell() < file.frames:
+
+            if (file.tell() + window_size) > file.frames:
+                # remaining samples < window size, pad with noise
+                l = file.frames - file.tell()
+                split = file.read(l)
+                sig = np.hstack((split, audio.noise(split, (window_size - len(split)), 0.23)))
+                last_block = True
+            else:
+                # read samples from file
+                sig = file.read(window_size)
+
+            block_count += 1
+
+            # Add to batch
+            samples.append(sig)
+            timestamps.append([start, end])
+
+            # Advance start and end
+            start += cfg.SIG_LENGTH - cfg.SIG_OVERLAP
+            end = start + cfg.SIG_LENGTH
+
+            # Check if batch is full or last block
+            if len(samples) < cfg.BATCH_SIZE and not last_block:
+                continue
+
+            # Predict
+            p = predict(samples)
+
+            # Add to results
+            for i in range(len(samples)):
+
+                # Get timestamp
+                s_start, s_end = timestamps[i]
+
+                # Get prediction
+                pred = p[i]
+
+                # Assign scores to labels
+                p_labels = dict(zip(cfg.LABELS, pred))
+
+                # Sort by score
+                p_sorted =  sorted(p_labels.items(), key=operator.itemgetter(1), reverse=True)
+
+                # Store results
+                results[str(s_start) + '-' + str(s_end)] = p_sorted
+
+            # store and clear results after a fixed number of blocks or last block
+            # 900: fits 15min of blocks in one go
+            if block_count % 900 == 0 or last_block:
+                print(f'storing results at block {block_count}')
+                r = storeResults(f_id, fpath, results)
+                results = {}
+
+            # Clear batch
+            samples = []
+            timestamps = []
+
+            if file.tell() != file.frames and overlap_seek < 0:
+                file.seek(overlap_seek, whence=sf.SEEK_CUR)
+
+    except:
+        # Print traceback
+        print(traceback.format_exc(), flush=True)
+
+        # Write error log
+        msg = f'Error: Cannot analyze audio file {fpath}.\n{traceback.format_exc()}'
+        print(msg, flush=True)
+        writeErrorLog(msg)
+        return False
+
+    finally:
+        file.close()
+        temp_dir.cleanup()
 
     delta_time = (datetime.datetime.now() - start_time).total_seconds()
     print(f'Finished {fpath} in {delta_time:.2f} seconds', flush=True)
