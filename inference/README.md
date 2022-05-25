@@ -10,6 +10,28 @@ sudo apt-get install ffmpeg
 sudo pip install tensorflow librosa minio psycopg2
 ```
 
+To get psycopg2 installed on macos arm64,
+provide linker/compiler info for openssl:
+
+```bash
+export LDFLAGS="-L/opt/homebrew/opt/openssl/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/openssl/include"
+```
+
+Some installations (in macos) end up with version conflicts
+(numpy, librosa, numba), follow this path to mitigate:
+
+```bash
+pip install numpy==1.26.6
+OPENBLAS="$(brew --prefix openblas)" pip install scipy
+brew install llvm@11
+LLVM_CONFIG=/opt/homebrew/opt/llvm@11/bin/llvm-config pip install llvmlite==0.37.0
+pip install numba==0.54.0
+pip install librosa
+pip install matplotlib pandas
+pip install jupyterlab
+```
+
 ### Running
 
 ```bash
