@@ -45,6 +45,8 @@ select *,
 from input_files
 ```
 
+Details on the impact of week filter can be found in the corresponding [report](./reports/report_birdnet-week-filter.md).
+
 ### Issues with file size
 
 Files larger than 1.5 GB cause the analysis process to run out of memory and crash.
