@@ -511,8 +511,8 @@ def analyzeFile(item):
                 results[str(s_start) + '-' + str(s_end)] = p_sorted
 
             # store and clear results after a fixed number of blocks or last block
-            # 900: fits 15min of blocks in one go
-            if block_count % 900 == 0 or last_block:
+            # 1200: fits 60min of (non-overlapping) blocks in one go
+            if block_count % 1200 == 0 or last_block:
                 if PDEBUG: print(f'storing results at block {block_count}')
                 storeResults(f_id, fpath, results)
                 results = {}
