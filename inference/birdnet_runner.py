@@ -26,7 +26,7 @@ import lib.audio as audio
 # for now, use manual id.
 # don't forget to change it between datasets
 # another option: int(datetime.datetime.now().timestamp())
-SELECTION_ID = 6
+SELECTION_ID = 1
 PDEBUG = False
 
 def clearErrorLog():
@@ -43,58 +43,45 @@ def loadFileSet():
 
     # SELECTION_ID 1
     fileset_query = '''
-    select file_id, file_path
-    from input_files
-    where device_id = '6444-8804'
-    order by time_start asc
-    '''
-
-    # SELECTION_ID 2
-    fileset_query = '''
-    select file_id, file_path
-    from input_files
-    where device_id = '4258-6870' and duration >= 3
-    order by time_start asc
-    '''
-
-    # SELECTION_ID 3
-    fileset_query = '''
-    select file_id, file_path
-    from input_files
-    where device_id ~ 'AM[12]' and duration >= 3
-    order by time_start asc
-    '''
-
-    # SELECTION_ID 3a (with less threads, fixing the out of memory tasks)
-    fileset_query = '''
-    select file_id, file_path
-    from input_files
-    where device_id ~ 'AM[12]' and duration >= 3 and not exists (
-        select from results where object_name = file_path
-    )
-    order by time_start asc
-    '''
-
-    # SELECTION_ID 3b (less threads, only files smaller than 1100MB)
-    fileset_query = '''
-    select file_id, file_path
-    from input_files
-    where device_id ~ 'AM[12]' and duration >= 3 and not exists (
-        select from results where object_name = file_path
-    ) and file_size < 1153433600
-    order by file_size desc
-    '''
-
-    # SELECTION_ID 4 / and 5 (to compare impact of week filter)
-    fileset_query = '''
     select file_id, file_path,
         floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
     from input_files
-    where device_id = '3704-8490' and duration >= 3 and file_size < 1153433600
+    where duration >= 3 and sample_rate = 48000 and
+        device_id ~ 'AM[12]'
     order by time_start asc
     '''
 
-    # SELECT_ID 6
+    # # SELECTION_ID 2
+    # fileset_query = '''
+    # select file_id, file_path,
+    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    # from input_files
+    # where duration >= 3 and sample_rate = 48000 and
+    #     device_id = '6444-8804'
+    # order by time_start asc
+    # '''
+
+    # # SELECTION_ID 3
+    # fileset_query = '''
+    # select file_id, file_path,
+    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    # from input_files
+    # where duration >= 3 and sample_rate = 48000 and
+    #     device_id = '4258-6870'
+    # order by time_start asc
+    # '''
+
+    # # SELECTION_ID 4
+    # fileset_query = '''
+    # select file_id, file_path,
+    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
+    # from input_files
+    # where duration >= 3 and sample_rate = 48000 and
+    #     device_id = '3704-8490'
+    # order by time_start asc
+    # '''
+
+    # SELECTION_ID 5
     # a.k.a. the ultimate birdnet query
     # all files that:
     # - don't show up in results
@@ -103,20 +90,13 @@ def loadFileSet():
     # - filesize < 1100MB
 
     # fileset_query = '''
-    # select count(*)
-    #     file_id, file_path,
+    # select file_id, file_path,
     #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
     # from input_files
     # where sample_rate = 48000 and duration >= 3 and not exists (
     #     select from results where object_name = file_path
-    # ) and file_size < 1153433600
+    # )
     # '''
-
-    fileset_query = '''
-    select file_id, file_path, floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    from input_files
-    where sample_rate = 48000 and duration >= 3 and file_size >= 1153433600
-    '''
 
     pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = pg_server.cursor()
