@@ -27,6 +27,7 @@ import lib.audio as audio
 # don't forget to change it between datasets
 # another option: int(datetime.datetime.now().timestamp())
 SELECTION_ID = 6
+PDEBUG = False
 
 def clearErrorLog():
 
@@ -187,6 +188,7 @@ def saveResultsToDb(f_id, object_name, r):
     cursor = pg_server.cursor()
 
     data = []
+    if PDEBUG: print('count of results:', len(r))
     for timestamp in sorted(r):
         for c in r[timestamp]:
             start, end = timestamp.split('-')
@@ -201,6 +203,7 @@ def saveResultsToDb(f_id, object_name, r):
                     label.split('_')[0],
                     SELECTION_ID))
 
+    if PDEBUG: print('count of results after filtering:', len(data))
     execute_values(cursor, insert_query, data, template=None, page_size=100)
     pg_server.commit()
     cursor.close()
@@ -355,9 +358,12 @@ def removeResultsFile(fpath):
             rtype = '.BirdNET.results.csv'
         rfpath = os.path.join(cfg.OUTPUT_PATH, rpath.rsplit('.', 1)[0] + rtype)
         if os.path.exists(rfpath):
-            print(f'removing existing result file: {rfpath}')
+            if PDEBUG: print(f'removing existing result file: {rfpath}')
             os.remove(rfpath)
-            os.removedirs(os.path.dirname(rfpath))
+            try:
+                os.removedirs(os.path.dirname(rfpath))
+            except OSError:
+                if PDEBUG: print(f'not removing {os.path.dirname(rfpath)} as it contains other files')
 
 def predict(samples):
 
@@ -375,6 +381,7 @@ def storeResults(f_id, fpath, results):
 
     try:
         # store results in database
+        if PDEBUG: print('storing results for', fpath)
         saveResultsToDb(f_id, fpath, results)
 
         # store results to file
@@ -425,7 +432,7 @@ def analyzeFile(item):
     # Remove exsting result file
     removeResultsFile(fpath)
 
-    temp_dir = tempfile.TemporaryDirectory() # close this in finally
+    temp_dir = tempfile.TemporaryDirectory()
     file = None
 
     # Read blocks of audio from file and process
@@ -448,24 +455,27 @@ def analyzeFile(item):
         client.fget_object(crd.minio.bucket, fpath, tmppath)
         file = sf.SoundFile(tmppath)
 
-        window_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
+        block_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
         overlap_seek = int(-cfg.SIG_OVERLAP * cfg.SAMPLE_RATE)
         last_block = False
         block_count = 0
 
         while file.tell() < file.frames:
 
-            if (file.tell() + window_size) > file.frames:
-                # remaining samples < window size, pad with noise
+            block_count += 1
+            if PDEBUG: print('--begin analysis loop. currently at {:.2f}% ({}s, block {})'.format(file.tell() / file.frames * 100., start, block_count), end='\n')
+
+            if (file.tell() + block_size) > file.frames:
+                # remaining samples < block size, pad with noise
                 l = file.frames - file.tell()
                 split = file.read(l)
-                sig = np.hstack((split, audio.noise(split, (window_size - len(split)), 0.23)))
+                sig = np.hstack((split, audio.noise(split, (block_size - len(split)), 0.23)))
                 last_block = True
             else:
                 # read samples from file
-                sig = file.read(window_size)
-
-            block_count += 1
+                sig = file.read(block_size)
+                if file.tell() == file.frames:
+                    last_block = True
 
             # Add to batch
             samples.append(sig)
@@ -503,13 +513,15 @@ def analyzeFile(item):
             # store and clear results after a fixed number of blocks or last block
             # 900: fits 15min of blocks in one go
             if block_count % 900 == 0 or last_block:
-                print(f'storing results at block {block_count}')
-                r = storeResults(f_id, fpath, results)
+                if PDEBUG: print(f'storing results at block {block_count}')
+                storeResults(f_id, fpath, results)
                 results = {}
 
             # Clear batch
             samples = []
             timestamps = []
+
+            if PDEBUG: print(f'--end of analysis loop. block_count: {block_count}, last_block: {last_block}, {file.tell()}, {file.frames}')
 
             if file.tell() != file.frames and overlap_seek < 0:
                 file.seek(overlap_seek, whence=sf.SEEK_CUR)
