@@ -82,6 +82,7 @@ CREATE TABLE files
 CREATE TABLE public.results
 (
     result_id serial,
+    task_id integer NOT NULL,
     selection_id integer NOT NULL,
     file_id integer NOT NULL,
     object_name text NOT NULL,
@@ -92,17 +93,58 @@ CREATE TABLE public.results
     PRIMARY KEY (result_id)
 );
 
+CREATE TABLE public.tasks
+(
+    task_id serial,
+    file_id integer NOT NULL,
+    config_id integer NOT NULL,
+    state integer NOT NULL,
+    scheduled_on TIMESTAMPTZ NOT NULL,
+    pickup_on TIMESTAMPTZ,
+    end_on TIMESTAMPTZ,
+    PRIMARY KEY (task_id)
+);
+
+CREATE TABLE public.configs
+(
+    config_id serial,
+    config TEXT NOT NULL,
+    comment TEXT,
+    PRIMARY KEY (config_id)
+);
+
 -- grant permissions
 ALTER TABLE IF EXISTS public.files
     OWNER to mitwelten_admin;
 ALTER TABLE IF EXISTS public.results
     OWNER to mitwelten_admin;
+ALTER TABLE IF EXISTS public.tasks
+    OWNER to mitwelten_admin;
+    ALTER TABLE IF EXISTS public.configs
+    OWNER to mitwelten_admin;
 
 GRANT ALL ON TABLE public.files TO mitwelten_internal;
 GRANT ALL ON TABLE public.results TO mitwelten_internal;
+GRANT ALL ON TABLE public.tasks TO mitwelten_internal;
+GRANT ALL ON TABLE public.configs TO mitwelten_internal;
 
 GRANT UPDATE ON SEQUENCE public.files_file_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.results_result_id_seq TO mitwelten_internal;
+GRANT UPDATE ON SEQUENCE public.tasks_task_id_seq TO mitwelten_internal;
+GRANT UPDATE ON SEQUENCE public.configs_config_id_seq TO mitwelten_internal;
 
 GRANT SELECT ON TABLE public.files TO mitwelten_public;
 GRANT SELECT ON TABLE public.results TO mitwelten_public;
+GRANT SELECT ON TABLE public.tasks TO mitwelten_public;
+GRANT SELECT ON TABLE public.configs TO mitwelten_public;
+
+-- add foreign keys
+ALTER TABLE public.tasks
+  ADD FOREIGN KEY (file_id)
+  REFERENCES files (file_id)
+  ON DELETE RESTRICT;
+
+ALTER TABLE public.tasks
+  ADD FOREIGN KEY (config_id)
+  REFERENCES configs (config_id)
+  ON DELETE RESTRICT;
