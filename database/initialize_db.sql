@@ -76,14 +76,14 @@ CREATE TABLE files
     comment varchar(64),
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone NOT NULL,
-    PRIMARY KEY (result_id)
+    PRIMARY KEY (file_id)
 );
 
 CREATE TABLE public.results
 (
     result_id serial,
-    selection_id bigint NOT NULL,
-    file_id bigint NOT NULL,
+    selection_id integer NOT NULL,
+    file_id integer NOT NULL,
     object_name text NOT NULL,
     time_start real NOT NULL,
     time_end real NOT NULL,
