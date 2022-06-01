@@ -41,7 +41,6 @@ def image_meta_worker(path, progress):
         with Image.open(path) as img:
             # cheap transposition to find truncated images
             # consider installing Pillow-SIMD if available for your architecture
-            # TODO: put this back in
             img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
             meta['resolution'] = img.size
 
