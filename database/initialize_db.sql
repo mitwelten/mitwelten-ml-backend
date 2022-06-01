@@ -26,6 +26,17 @@ CREATE ROLE mitwelten_internal WITH
     -- replace with password
     PASSWORD '***';
 
+CREATE ROLE mitwelten_upload WITH
+    LOGIN
+    NOSUPERUSER
+    INHERIT
+    NOCREATEDB
+    NOCREATEROLE
+    NOREPLICATION
+    CONNECTION LIMIT -1
+    -- replace with password
+    PASSWORD '***';
+
 CREATE ROLE mitwelten_public WITH
     LOGIN
     NOSUPERUSER
@@ -39,23 +50,18 @@ CREATE ROLE mitwelten_public WITH
 
 -- tables
 
-CREATE TABLE files
+CREATE TABLE public.files
 (
     file_id serial,
     original_file_path text NOT NULL,
     sha256 varchar(64),
     disk varchar(64),
     action varchar(32),
-    state varchar(32),
-    --
-    -- created_on timestamp with time zone NOT NULL,
-    -- updated_on timestamp with time zone NOT NULL,
-    -- uploaded_on timestamp with time zone,
-    --
+    state varchar(32)
     file_path text,
     file_name text,
-    time_start timestamp with time zone,
-    time_end timestamp with time zone,
+    time_start timestamptz,
+    time_end timestamptz,
     location point,
     file_size integer,
     format varchar(64),
@@ -74,16 +80,16 @@ CREATE TABLE files
     rec_end_status varchar(32)
     class varchar(32),
     comment varchar(64),
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    created_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL,
     PRIMARY KEY (file_id)
 );
 
 CREATE TABLE public.results
 (
     result_id serial,
-    task_id integer NOT NULL,
-    selection_id integer NOT NULL,
+    -- task_id integer NOT NULL, -- in development
+    selection_id integer NOT NULL, -- to phase out
     file_id integer NOT NULL,
     object_name text NOT NULL,
     time_start real NOT NULL,
@@ -92,6 +98,18 @@ CREATE TABLE public.results
     species character varying(255) NOT NULL,
     PRIMARY KEY (result_id)
 );
+
+CREATE TABLE public.species_occurrence
+(
+    id serial,
+    species varchar(255) NOT NULL,
+    occurence integer,
+    unlikely boolean,
+    comment text,
+    PRIMARY KEY (id),
+    UNIQUE (species)
+);
+
 
 CREATE TABLE public.tasks
 (
@@ -110,7 +128,8 @@ CREATE TABLE public.configs
     config_id serial,
     config TEXT NOT NULL,
     comment TEXT,
-    PRIMARY KEY (config_id)
+    PRIMARY KEY (config_id),
+    UNIQUE (config)
 );
 
 CREATE TABLE public.files_image (
@@ -143,13 +162,13 @@ GRANT ALL ON TABLE public.files TO mitwelten_internal;
 GRANT ALL ON TABLE public.results TO mitwelten_internal;
 GRANT ALL ON TABLE public.tasks TO mitwelten_internal;
 GRANT ALL ON TABLE public.configs TO mitwelten_internal;
-GRANT ALL ON TABLE public.files_image TO mitwelten_internal;
+GRANT ALL ON TABLE public.files_image TO mitwelten_internal, mitwelten_upload;
 
 GRANT UPDATE ON SEQUENCE public.files_file_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.results_result_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.tasks_task_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.configs_config_id_seq TO mitwelten_internal;
-GRANT UPDATE ON SEQUENCE public.files_image_file_id_seq TO mitwelten_internal;
+GRANT UPDATE ON SEQUENCE public.files_image_file_id_seq TO mitwelten_internal, mitwelten_upload;
 
 GRANT SELECT ON TABLE public.files TO mitwelten_public;
 GRANT SELECT ON TABLE public.results TO mitwelten_public;
