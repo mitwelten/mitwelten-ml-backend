@@ -1,27 +1,23 @@
-import os
-import sys
-import re
 import argparse
-import traceback
-import pprint
 import hashlib
-from datetime import datetime, timezone
 import logging
 import mimetypes
-
-sys.path.append('../../')
-import credentials as crd
+import os
+import re
+import sys
+import traceback
+from datetime import datetime, timezone
 
 import psycopg2 as pg
 from psycopg2 import pool
-
 from minio import Minio
 from minio.commonconfig import Tags
-
+from PIL import Image
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import thread_map
 
-from PIL import Image, ExifTags
+sys.path.append('../../')
+import credentials as crd
 
 dbConnectionPool = None
 storage = None
