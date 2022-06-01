@@ -113,6 +113,20 @@ CREATE TABLE public.configs
     PRIMARY KEY (config_id)
 );
 
+CREATE TABLE public.files_image (
+    file_id serial,
+    object_name TEXT NOT NULL,
+    sha256 VARCHAR(64) NOT NULL,
+    time timestamptz NOT NULL,
+    node_id VARCHAR(32) NOT NULL,
+    file_size INTEGER NOT NULL,
+    resolution integer[] NOT NULL,
+    location point,
+    PRIMARY KEY (file_id),
+    UNIQUE (object_name),
+    UNIQUE (sha256)
+);
+
 -- grant permissions
 ALTER TABLE IF EXISTS public.files
     OWNER to mitwelten_admin;
@@ -120,23 +134,28 @@ ALTER TABLE IF EXISTS public.results
     OWNER to mitwelten_admin;
 ALTER TABLE IF EXISTS public.tasks
     OWNER to mitwelten_admin;
-    ALTER TABLE IF EXISTS public.configs
+ALTER TABLE IF EXISTS public.configs
+    OWNER to mitwelten_admin;
+ALTER TABLE IF EXISTS public.files_image
     OWNER to mitwelten_admin;
 
 GRANT ALL ON TABLE public.files TO mitwelten_internal;
 GRANT ALL ON TABLE public.results TO mitwelten_internal;
 GRANT ALL ON TABLE public.tasks TO mitwelten_internal;
 GRANT ALL ON TABLE public.configs TO mitwelten_internal;
+GRANT ALL ON TABLE public.files_image TO mitwelten_internal;
 
 GRANT UPDATE ON SEQUENCE public.files_file_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.results_result_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.tasks_task_id_seq TO mitwelten_internal;
 GRANT UPDATE ON SEQUENCE public.configs_config_id_seq TO mitwelten_internal;
+GRANT UPDATE ON SEQUENCE public.files_image_file_id_seq TO mitwelten_internal;
 
 GRANT SELECT ON TABLE public.files TO mitwelten_public;
 GRANT SELECT ON TABLE public.results TO mitwelten_public;
 GRANT SELECT ON TABLE public.tasks TO mitwelten_public;
 GRANT SELECT ON TABLE public.configs TO mitwelten_public;
+GRANT SELECT ON TABLE public.files_image TO mitwelten_public;
 
 -- add foreign keys
 ALTER TABLE public.tasks
