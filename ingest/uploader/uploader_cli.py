@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import psycopg2 as pg
 from psycopg2 import pool
+from psycopg2.extras import execute_values
 from minio import Minio
 from minio.commonconfig import Tags
 from PIL import Image
@@ -27,7 +28,7 @@ BS = 65536
 
 def image_meta_worker(path, progress):
 
-    # from filename: node_id, timestamp
+    # from filename: node_label, timestamp
     # from exif: resolution
     # from os: filesize
     # from file: hash
@@ -58,10 +59,10 @@ def image_meta_worker(path, progress):
         # 0344-6782_2021-07-03T12-13-46Z.jpg
         fnparts = re.search(r'(\d{4}-\d{4})_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)\.jpe?g', meta['file_name'])
         if fnparts:
-            meta['node_id'] = fnparts[1]
+            meta['node_label'] = fnparts[1]
             meta['timestamp'] = datetime.strptime(fnparts[2], '%Y-%m-%dT%H-%M-%SZ').replace(tzinfo=timezone.utc)
         else:
-            raise ValueError(f"Error parsing filename for node_id and timestamp: {meta['file_name']}", )
+            raise ValueError(f"Error parsing filename for node label and timestamp: {meta['file_name']}", )
     except Exception as e:
         progress.write(f'{path}: {e}')
         meta = None
@@ -73,7 +74,7 @@ def image_upload_worker(file):
     cursor = db.cursor()
 
     tags = Tags(for_object=True)
-    tags['node_id'] = str(file['node_id'])
+    tags['node_label'] = str(file['node_label'])
     query = '''
     INSERT INTO {}.files_image (
         object_name,
@@ -82,29 +83,33 @@ def image_upload_worker(file):
         node_id,
         file_size,
         resolution,
-        location)
+        location_id,
+        created_at,
+        updated_at)
     VALUES (
-        %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (node_id, timestamp)
-        || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s, -- file_name (node_id, timestamp, extension)
+        %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (node_label, timestamp)
+        || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s, -- file_name (node_label, timestamp, extension)
         %s, -- sha256
         %s, -- time
-        %s, -- node_id
+        (SELECT node_id from {}.nodes WHERE node_label = %s), -- node_id
         %s, -- file_size
         %s, -- resolution
-        %s) -- location
+        %s, -- location_id
+        CURRENT_TIMESTAMP, -- created_at
+        CURRENT_TIMESTAMP) -- updated_at
     ON CONFLICT DO NOTHING
     RETURNING file_id, object_name
     '''.format(crd.db.schema, crd.db.schema)
     try:
         cursor.execute(query, (
-            file['node_id'],
+            file['node_label'],
             file['timestamp'],
-            file['node_id'],
+            file['node_label'],
             file['timestamp'],
             '.jpg',
             file['sha256'],
             file['timestamp'],
-            file['node_id'],
+            file['node_label'],
             file['file_size'],
             [int(px) for px in file['resolution']],
             None
@@ -194,8 +199,8 @@ def check_image_duplicates(imagefiles):
     query = '''
     WITH n AS (
         SELECT %s as sha256,
-        %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (device_id, time_start)
-        || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s -- file_name (device_id, time_start, extension)
+        %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (node_label, time_start)
+        || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s -- file_name (node_label, time_start, extension)
         as object_name
     )
     SELECT f.sha256 = n.sha256 as hash_match,
@@ -208,9 +213,9 @@ def check_image_duplicates(imagefiles):
     for file in imagefiles.values():
         cursor.execute(query, (
             file['sha256'],
-            file['node_id'],
+            file['node_label'],
             file['timestamp'],
-            file['node_id'],
+            file['node_label'],
             file['timestamp'],
             '.jpg'
             ))
@@ -230,6 +235,24 @@ def check_image_duplicates(imagefiles):
     dbConnectionPool.putconn(db)
     print(f'found {len(upload_list)} image files that don\'t exist in db/storage')
     return upload_list
+
+def update_nodes(imagefiles, node_type):
+    node_labels = {}
+    for file in imagefiles:
+        if file['node_label'] in node_labels:
+            node_labels[file['node_label']] += 1
+        else:
+            node_labels[file['node_label']] = 1
+
+    records = [(node_label, node_type) for node_label in node_labels]
+    db = dbConnectionPool.getconn()
+    cursor = db.cursor()
+    query = 'INSERT INTO {}.nodes(node_label, type) VALUES %s ON CONFLICT DO NOTHING'.format(crd.db.schema)
+    print(f'found {len(node_labels)} node labels:', ','.join([n for n in node_labels.keys()]))
+    execute_values(cursor, query, records)
+    db.commit()
+    cursor.close()
+    dbConnectionPool.putconn(db)
 
 def is_readable_dir(arg):
     try:
@@ -290,6 +313,8 @@ def main():
     # check image duplicates in DB
     # duplicate check and upload is seperate to preemtivly check for errors
     imagefiles = check_image_duplicates(imagefiles)
+
+    update_nodes(imagefiles, 'cam')
 
     # upload files
     if len(imagefiles) > 0:
