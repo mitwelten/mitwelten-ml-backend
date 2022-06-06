@@ -75,7 +75,7 @@ def image_upload_worker(file):
     tags = Tags(for_object=True)
     tags['node_id'] = str(file['node_id'])
     query = '''
-    INSERT INTO files_image (
+    INSERT INTO {}.files_image (
         object_name,
         sha256,
         time,
@@ -94,7 +94,7 @@ def image_upload_worker(file):
         %s) -- location
     ON CONFLICT DO NOTHING
     RETURNING file_id, object_name
-    '''
+    '''.format(crd.db.schema, crd.db.schema)
     try:
         cursor.execute(query, (
             file['node_id'],
@@ -123,7 +123,7 @@ def image_upload_worker(file):
         except:
             logger.error(traceback.format_exc())
             logger.error('failed uploading: deleting record from db')
-            query = 'DELETE FROM files_image WHERE file_id = %s'
+            query = 'DELETE FROM {}.files_image WHERE file_id = %s'.format(crd.db.schema)
             cursor.execute(query, (file_id,))
             db.commit()
         else:
@@ -200,9 +200,9 @@ def check_image_duplicates(imagefiles):
     )
     SELECT f.sha256 = n.sha256 as hash_match,
         f.object_name = n.object_name as object_name_match
-    from files_image f, n
+    from {}.files_image f, n
     where (f.sha256 = n.sha256 or f.object_name = n.object_name)
-    '''
+    '''.format(crd.db.schema)
     upload_list = []
     progress = tqdm(total=len(imagefiles))
     for file in imagefiles.values():
