@@ -1,5 +1,7 @@
 # REPORT: Cleaning and import of existing audio data
 
+__Heads Up!__ Up to the tag [uploader-db-schema-v1](https://github.com/mitwelten/mitwelten-ml-backend/releases/tag/uploader-db-schema-v1) the database schema is compatible with the database structure described in this file. After that, a new schema is used with new table names, a reduced and renamed set of columns in the `files` table and separate tables for nodes and locations. The proceedings laid out here are _not compatible_ with the [new schema, v2](https://github.com/mitwelten/mitwelten-db-backend/schema/mitwelten_v2.sql).
+
 ## Abstract
 
 The audio data of FS1 (2021) was collected using [Audiomoth recording devices](https://www.openacousticdevices.info/audiomoth) and stored on USB harddrives.
