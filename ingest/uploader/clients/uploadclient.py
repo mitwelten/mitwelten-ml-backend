@@ -40,10 +40,9 @@ class UploadClient(QThread):
             cursor = db.cursor()
 
             # 1. insert record into db
-            # 2. get filename from insert
+            # 2. get file_id and object_name from insert
             file_id  = None
-            file_path  = None
-            file_name = None
+            object_name  = None
             # 3. upload
             etag = None
             # 4. confirm in db
@@ -52,21 +51,16 @@ class UploadClient(QThread):
                 # TODO: add created_at, updated_at
                 # TODO: add coordinates
                 query = '''
-                INSERT INTO files(
-                    file_path,
-                    file_name,
-                    original_file_path,
-                    disk,
-                    action,
-                    state,
+                INSERT INTO {}.files_audio (
+                    object_name,
                     sha256,
-                    time_start,
+                    time,
                     file_size,
                     format,
                     sample_rate,
                     bit_depth,
                     channels,
-                    device_id,
+                    node_id,
                     serial_number,
                     battery,
                     temperature,
@@ -79,20 +73,16 @@ class UploadClient(QThread):
                     created_at,
                     updated_at)
                 VALUES (
-                    %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/'), -- file_path (node_label, time_start)
-                    %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||'.wav', -- file_name (node_label, time_start)
-                    %s, -- original_file_path
-                    'direct',  -- disk
-                    'upload',  -- action
-                    'pending', -- state
+                    %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (node_label, timestamp)
+                    || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s, -- file_name (node_label, timestamp, extension)
                     %s, -- sha256
-                    %s, -- time_start
+                    %s, -- time
                     %s, -- file_size
                     %s, -- format
                     %s, -- sample_rate
                     %s, -- bit_depth
                     %s, -- channels
-                    %s, -- node_label
+                    (SELECT node_id from {}.nodes WHERE node_label = %s), -- node_id
                     %s, -- serial_number
                     %s, -- battery
                     %s, -- temperature
@@ -102,15 +92,14 @@ class UploadClient(QThread):
                     %s, -- source,
                     %s, -- rec_end_status
                     %s, -- comment
-                    now(), -- created_at
-                    now()) -- updated_at
-                RETURNING file_id, file_path, file_name
-                '''
+                    CURRENT_TIMESTAMP, -- created_at
+                    CURRENT_TIMESTAMP) -- updated_at
+                RETURNING file_id, object_name
+                '''.format(crd.db.schema, crd.db.schema)
 
                 cursor.execute(query, (
                     item['node_label'], item['time_start'],
-                    item['node_label'], item['time_start'],
-                    item['original_file_path'],
+                    item['node_label'], item['time_start'], '.wav',
                     item['sha256'],
                     item['time_start'],
                     item['filesize'],
@@ -130,7 +119,7 @@ class UploadClient(QThread):
                     item['comment']
                 ))
                 db.commit()
-                file_id, file_path, file_name = cursor.fetchone()
+                file_id, object_name = cursor.fetchone()
             except Exception as e:
                 print('Error occurred while inserting record for file {}: {}'.format(item['original_file_path'],e))
                 # logger.error(f"error occurred for file_id: {file_id}: {exc}")
@@ -146,20 +135,19 @@ class UploadClient(QThread):
                 tags['duration'] = str(item['duration'])
 
                 source = item['original_file_path']
-                target = f'{file_path}{file_name}'
 
                 # upload file
-                result = storage.fput_object(crd.minio.bucket, target, source,
+                result = storage.fput_object(crd.minio.bucket, object_name, source,
                     content_type='audio/x-wav', metadata=metadata, tags=tags)
-                # update db: state = 'uploaded', action = null
-                query = '''UPDATE files SET action = null, state = 'uploaded', updated_at = now() WHERE file_id = %s'''
+                # set upload timestamp
+                query = 'UPDATE {}.files_audio SET updated_at = CURRENT_TIMESTAMP WHERE file_id = %s'.format(crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
                 # report
                 # logger.info(f'created {result.object_name}; file_id: {file_id}, etag: {result.etag}')
             except Exception as exc:
-                # update db: state = 'upload_error'
-                query = '''UPDATE files SET state = 'upload_error', updated_at = now() WHERE file_id = %s'''
+                # delete record from db
+                query = 'DELETE FROM {}.files_audio WHERE file_id = %s'.format(crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
                 # report
