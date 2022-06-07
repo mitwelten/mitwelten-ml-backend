@@ -45,7 +45,7 @@ class Runner(object):
     def store_config(self, config: BirdnetConfig) -> None:
         '''Store config to DB'''
         try:
-            query = 'insert into configs(config) values (%s)'
+            query = 'insert into {}.birdnet_configs(config) values (%s)'.format(crd.db.schema)
             self.cursor.execute(query, (json.dumps(config.__dict__, indent=None, skipkeys=True),))
             self.connection.commit()
         except:
@@ -54,7 +54,7 @@ class Runner(object):
 
     def get_config(self, config_id: int) -> dict:
         '''Read config from DB'''
-        query = 'select config from configs where config_id = %s'
+        query = 'select config from {}.birdnet_configs where config_id = %s'.format(crd.db.schema)
         try:
             self.cursor.execute(query, (config_id,))
             row = self.cursor.fetchone()
@@ -66,11 +66,11 @@ class Runner(object):
     def get_tasks(self):
         query = '''
         SELECT file_id
-        FROM tasks
+        FROM {}.birdnet_tasks
         WHERE state = 0
         LIMIT 2
         FOR UPDATE SKIP LOCKED
-        '''
+        '''.format(crd.db.schema)
         while True:
             self.cursor.execute(query)
             tasks = self.cursor.fetchall()
@@ -81,11 +81,12 @@ class Runner(object):
 
     def schedule_tasks(self, config_id):
         self.cursor.execute('''
-        insert into tasks(file_id, config_id, state, scheduled_on)
-        select file_id, %s, %s, NOW() from files
-        where duration >= 3 and sample_rate = 48000 and device_id = '3704-8490'
+        -- this is an example query
+        insert into {}.birdnet_tasks(file_id, config_id, state, scheduled_on)
+        select file_id, %s, %s, NOW() from {}.birdnet_input
+        where duration >= 3 and sample_rate = 48000 and node_label = %s
         limit 10
-        ''', (config_id, 0))
+        '''.format(crd.db.schema, crd.db.schema), (config_id, 0, '3704-8490'))
         self.connection.commit()
 
 def gen_tasks():
@@ -98,7 +99,7 @@ def proc(queue, iolock):
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         cursor = connection.cursor()
         cursor.execute('''
-        update tasks
+        update {}.birdnet_tasks
         set state = 1, pickup_on = now()
         where task_id in (
             select task_id from tasks
@@ -108,7 +109,7 @@ def proc(queue, iolock):
             limit 1
         )
         returning task_id, file_id, config_id;
-        ''')
+        '''.format(crd.db.schema))
         task = cursor.fetchone();
         connection.commit()
 
@@ -124,10 +125,10 @@ def proc(queue, iolock):
             print(f'done processing {task}')
 
         cursor.execute('''
-        update tasks
+        update {}.birdnet_tasks
         set state = 2, end_on = now()
         where task_id = %s
-        ''', (task[0],))
+        '''.format(crd.db.schema), (task[0],))
         connection.commit()
 
 if __name__ == '__main__':
