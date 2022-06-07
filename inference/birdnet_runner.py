@@ -44,7 +44,7 @@ def loadFileSet():
     # BATCH_ID 1
     fileset_query = '''
     select file_id, object_name,
-        floor((extract(doy from time - 1)/(365/48.))::integer + 1 as week
+        floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
     from {}.birdnet_input
     where duration >= 3 and sample_rate = 48000 and
         node_label ~ 'AM[12]'
