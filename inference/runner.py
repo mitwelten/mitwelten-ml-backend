@@ -68,6 +68,7 @@ class Runner(object):
         except:
             self.connection.rollback()
             print('Error storing configuration to db.')
+            raise
 
     def get_config(self, config_id: int) -> dict:
         '''Read config from DB'''
@@ -79,6 +80,17 @@ class Runner(object):
         except:
             print('Error fetching configuration from db.')
             return {}
+
+    def set_default_config(self):
+        config = BirdnetConfig()
+        config.species_list = {
+            'auto': {
+                'lon': 7.613764385606163, # merian gardens
+                'lat': 47.53774126535403,
+                'auto_season': False,     # use inferrend yearly list
+                'loc_filter_thresh': 0.03
+            }}
+        return self.store_config(config, 'default configuration')
 
     def get_tasks(self):
         query = '''
