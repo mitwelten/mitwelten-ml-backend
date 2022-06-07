@@ -6,7 +6,6 @@ import librosa
 import config as cfg
 import credentials as crd
 
-import psycopg2 as pg
 from minio import Minio
 
 RANDOM = np.random.RandomState(cfg.RANDOM_SEED)
