@@ -29,6 +29,8 @@ To upload audiofiles recorded by Audiomoths, you can use the [mitwelten-audio-up
 
 ## database
 
+__Retired database schema__, for current setup check [mitwelten-db-backend](https://github.com/mitwelten/mitwelten-db-backend).
+
 - __files__ (metadata)
 - __datasets__ (collections of files)
 - __paramsets__ (inference configuration)

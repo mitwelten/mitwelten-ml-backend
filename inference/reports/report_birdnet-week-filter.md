@@ -121,7 +121,7 @@ Some of the species are completely removed species:
 Datasource:
 
 ```sql
--- based on schema v1
+-- based on schema v1, retired
 with a as (select species, count(*) as speccount
     from results
     left join input_files on results.file_id = input_files.file_id
