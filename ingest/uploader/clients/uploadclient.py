@@ -79,8 +79,8 @@ class UploadClient(QThread):
                     created_at,
                     updated_at)
                 VALUES (
-                    %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/'), -- file_path (device_id, time_start)
-                    %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||'.wav', -- file_name (device_id, time_start)
+                    %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/'), -- file_path (node_label, time_start)
+                    %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||'.wav', -- file_name (node_label, time_start)
                     %s, -- original_file_path
                     'direct',  -- disk
                     'upload',  -- action
@@ -92,7 +92,7 @@ class UploadClient(QThread):
                     %s, -- sample_rate
                     %s, -- bit_depth
                     %s, -- channels
-                    %s, -- device_id
+                    %s, -- node_label
                     %s, -- serial_number
                     %s, -- battery
                     %s, -- temperature
@@ -108,8 +108,8 @@ class UploadClient(QThread):
                 '''
 
                 cursor.execute(query, (
-                    item['device_id'], item['time_start'],
-                    item['device_id'], item['time_start'],
+                    item['node_label'], item['time_start'],
+                    item['node_label'], item['time_start'],
                     item['original_file_path'],
                     item['sha256'],
                     item['time_start'],
@@ -118,7 +118,7 @@ class UploadClient(QThread):
                     item['sample_rate'],
                     item['bit_depth'],
                     item['channels'],
-                    item['device_id'],
+                    item['node_label'],
                     item['serial_number'],
                     item['battery'],
                     item['temperature'],
@@ -141,7 +141,7 @@ class UploadClient(QThread):
 
                 tags = Tags(for_object=True)
                 tags['serial_number'] = str(item['serial_number'])
-                tags['device_id'] = str(item['device_id'])
+                tags['node_label'] = str(item['node_label'])
                 tags['sample_rate'] = str(item['sample_rate'])
                 tags['duration'] = str(item['duration'])
 

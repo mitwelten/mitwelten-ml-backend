@@ -25,11 +25,11 @@ class MetaDataReader(QThread):
     totalChanged = pyqtSignal(int)
     extractFinished = pyqtSignal(list)
 
-    def __init__(self, dbConnectionPool, path, device_id):
+    def __init__(self, dbConnectionPool, path, node_label):
         QThread.__init__(self)
         self.dbConnectionPool = dbConnectionPool
         self.path = path
-        self.device_id = device_id
+        self.node_label = node_label
 
     def run(self):
         audiofiles = []
@@ -66,7 +66,7 @@ class MetaDataReader(QThread):
             audiofiles[i] = self.extract_meta(audiofiles[i])
             audiofiles[i]['row_id'] = i
             audiofiles[i]['row_state'] = -1 # -1:no state, 0:OK, 1:error
-            audiofiles[i]['device_id'] = self.device_id
+            audiofiles[i]['node_label'] = self.node_label
             audiofiles[i]['comment'] = None
             audiofiles[i]['duplicate_check'] = self.checkDuplicate(cursor, audiofiles[i])
             self.countChanged.emit(i+1, audiofiles[i]['original_file_path'])
@@ -79,7 +79,7 @@ class MetaDataReader(QThread):
         if len(result) == 2:
             return f'{result[0]}-{result[1]}'
         else:
-            raise ValueError(f'{arg}: Incorrect format for ID (0000-0000)')
+            raise ValueError(f'{arg}: Incorrect format for node label (0000-0000)')
 
     def is_readable_dir(self, arg):
         try:
@@ -103,7 +103,7 @@ class MetaDataReader(QThread):
         from files f, n where state = 'uploaded' and
             (f.sha256 = n.sha256 or f.file_name = n.file_name)
         '''
-        cursor.execute(query, (item['sha256'], item['device_id'], item['time_start']))
+        cursor.execute(query, (item['sha256'], item['node_label'], item['time_start']))
         result = cursor.fetchone()
         if result is None:
             result = (False, False)
