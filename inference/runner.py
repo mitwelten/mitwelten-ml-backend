@@ -1,6 +1,7 @@
 import sys
 import json
 import psycopg2 as pg
+from psycopg2 import errors
 import multiprocessing as mp
 import time
 import os
@@ -42,12 +43,28 @@ class Runner(object):
         self.cursor.close()
         self.connection.close()
 
-    def store_config(self, config: BirdnetConfig) -> None:
+    def store_config(self, config: BirdnetConfig, comment = None) -> None:
         '''Store config to DB'''
+        config_str = json.dumps(config.__dict__, indent=None, skipkeys=True)
         try:
-            query = 'insert into {}.birdnet_configs(config) values (%s)'.format(crd.db.schema)
-            self.cursor.execute(query, (json.dumps(config.__dict__, indent=None, skipkeys=True),))
+            query = '''
+            insert into {}.birdnet_configs(config, comment)
+            values (%s, %s)
+            returning config_id
+            '''.format(crd.db.schema)
+            self.cursor.execute(query, (config_str, comment))
             self.connection.commit()
+            config_id, = self.cursor.fetchone()
+            return config_id
+        except pg.errors.UniqueViolation:
+            self.connection.rollback()
+            self.cursor.execute('''
+            select config_id, comment from {}.birdnet_configs
+            where config = %s
+            '''.format(crd.db.schema), (config_str,))
+            config_id, comment = self.cursor.fetchone()
+            print(f'Configuration already exists: ID {config_id}, comment "{comment}"')
+            return config_id
         except:
             self.connection.rollback()
             print('Error storing configuration to db.')
