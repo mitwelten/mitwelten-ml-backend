@@ -41,12 +41,12 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='1.0.0'
+    version='2.0.0'
 )
 app = BUNDLE(
     exe,
     name='Mitwelten Audio Uploader.app',
     icon=None,
     bundle_identifier='org.mitwelten.mitwelten-audio-uploader',
-    version='1.0.0'
+    version='2.0.0'
 )
