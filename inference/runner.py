@@ -184,13 +184,11 @@ if __name__ == '__main__':
 
     # wrap this in while loop that slowly checks
     # for new stuff in the queue after it runs out of tasks
-    for task in gen_tasks():
+    for task in range(4):
         queue.put(task)
         with iolock:
             print(f'queued {task}')
 
-    for _ in range(4):
-        queue.put(None)
     pool.close()
     pool.join()
 
