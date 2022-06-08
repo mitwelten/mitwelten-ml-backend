@@ -137,6 +137,7 @@ def gen_tasks():
         print('fetch')
         yield i
 
+# TODO: on KeyboardInterrupt: cancel processing, rollback and set task to state 0
 def proc(queue, iolock):
     while True:
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
@@ -156,13 +157,12 @@ def proc(queue, iolock):
         task = cursor.fetchone();
         connection.commit()
 
-        print(task)
-
         if task == None:
             break
 
         with iolock:
             print(f'processing {task}...')
+        # TODO: wrap birdnet inferrence run in try/except/finally and handle success/error
         time.sleep(2)
         with iolock:
             print(f'done processing {task}')
