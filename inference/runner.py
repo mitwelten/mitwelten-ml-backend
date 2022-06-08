@@ -141,18 +141,18 @@ def proc(queue, iolock):
     while True:
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         cursor = connection.cursor()
-        cursor.execute('''
-        update {}.birdnet_tasks
+        cursor.execute(f'''
+        update {crd.db.schema}.birdnet_tasks
         set state = 1, pickup_on = now()
         where task_id in (
-            select task_id from tasks
+            select task_id from {crd.db.schema}.birdnet_tasks
             where state = 0
             order by task_id
             for update skip locked
             limit 1
         )
         returning task_id, file_id, config_id;
-        '''.format(crd.db.schema))
+        ''')
         task = cursor.fetchone();
         connection.commit()
 
