@@ -191,13 +191,12 @@ class BirdnetWorker(object):
                 samples = []
                 timestamps = []
         except:
-            print('error occurred during prediction')
             # delete results from db
+            print(f'error occurred during prediction, deleting results for task {self.task_id}')
             self.cursor.execute(f'delete from {SCHEMA}.birdnet_results where task_id = %s', (self.task_id,))
             self.connection.commit()
             raise
         finally:
-            print(f'closing file, removing temp_dir for task {self.task_id}')
             file.close()
             temp_dir.cleanup()
 

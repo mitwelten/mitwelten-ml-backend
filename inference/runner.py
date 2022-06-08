@@ -142,34 +142,31 @@ def proc(queue, iolock):
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
-    while True:
-        cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
-        update {crd.db.schema}.birdnet_tasks
-        set state = 1, pickup_on = now()
-        where task_id in (
-            select task_id from {crd.db.schema}.birdnet_tasks
-            where state = 0
-            order by task_id
-            for update skip locked
-            limit 1
-        )
-        returning task_id, file_id, config_id;
-        ''')
-        task = cursor.fetchone();
-        connection.commit()
 
-        if task == None:
+    while True:
+        try:
+            task = queue.get()
+        except KeyboardInterrupt:
             break
 
-        finish_query = f'''
-            update {crd.db.schema}.birdnet_tasks
-            set state = %s, end_on = now()
-            where task_id = %s
-            '''
         try:
+            if task == None:
+                print('task is None, break. what now?')
+                break
+
+            finish_query = f'''
+                update {crd.db.schema}.birdnet_tasks
+                set state = %s, end_on = now()
+                where task_id = %s
+                '''
             birdnet.configure(task[0])
             birdnet.load_species_list()
             birdnet.analyse()
+        except KeyboardInterrupt:
+            print(f'task {task[0]} failed: KeyboardInterrupt')
+            cursor.execute(finish_query, (3, task[0],))
+            connection.commit()
+            break
         except:
             print(f'task {task[0]} failed')
             cursor.execute(finish_query, (3, task[0],))
@@ -177,7 +174,39 @@ def proc(queue, iolock):
             print(f'task {task[0]} succeeded')
             cursor.execute(finish_query, (2, task[0],))
         finally:
+            print('running finally')
             connection.commit()
+    print('reached bottom')
+
+def tasks(connection):
+    cursor = connection.cursor()
+    while True:
+        try:
+            cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
+            update {crd.db.schema}.birdnet_tasks
+            set state = 1, pickup_on = now()
+            where task_id in (
+                select task_id from {crd.db.schema}.birdnet_tasks
+                where state = 0
+                order by task_id
+                for update skip locked
+                limit 1
+            )
+            returning task_id, file_id, config_id;
+            ''')
+            connection.commit()
+            task = cursor.fetchone()
+            if task:
+                yield task
+            else:
+                print('sleeping...')
+                time.sleep(10)
+        except KeyboardInterrupt:
+            print('stop requested, exiting tasks generator')
+            break
+        except:
+            print('other error occured, exiting task generator')
+            break
 
 if __name__ == '__main__':
     # https://stackoverflow.com/questions/43078980/python-multiprocessing-with-generator
@@ -198,15 +227,28 @@ if __name__ == '__main__':
         runner.queue_batch(config_id, args.add_batch)
 
     if args.run:
-        queue = mp.Queue(maxsize=4)
+        connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+        ncpus = os.cpu_count()
+        queue = mp.Queue(maxsize=ncpus)
         iolock = mp.Lock()
-        pool = mp.Pool(4, initializer=proc, initargs=(queue, iolock))
+        pool = mp.Pool(ncpus, initializer=proc, initargs=(queue, iolock))
 
-        # wrap this in while loop that slowly checks
-        # for new stuff in the queue after it runs out of tasks
-        for task in range(4):
-            queue.put(task)
-            with iolock:
-                print(f'queued {task}')
+        for task in tasks(connection):
+            try:
+                queue.put(task)
+
+            except KeyboardInterrupt:
+                print('signalling tasks to end')
+                print('to cancel running tasks, send another interrupt')
+                for i in range(ncpus):
+                    queue.put(None)
+                break
+
+        print('waiting for tasks to end...')
         pool.close()
         pool.join()
+
+        print('cleaning up...')
+        connection.close()
+
+        print('done.')
