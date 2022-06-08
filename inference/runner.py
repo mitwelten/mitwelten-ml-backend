@@ -8,6 +8,7 @@ import time
 import os
 
 from birdnet_batches import batches
+from birdnet_worker import BirdnetWorker
 
 sys.path.append('../')
 import credentials as crd
@@ -31,6 +32,8 @@ class BirdnetConfig(object):
         }
         # self.result_type = 'audacity'
         self.model_version = 'BirdNET_GLOBAL_2K_V2.1_Model_FP32'
+        # MIN_CONFIDENCE threshold is read from birdnet config.py (0.1)
+        # SIGMOID_SENSITIVITY is read from birdnet config.py (1.0)
 
 
 
@@ -129,21 +132,18 @@ class Runner(object):
         - Tasks to be kept should throw FK error (results refere to the source task)
         - Only active tasks shoud be kept
         '''
-        query = f'delete from {crd.db.schema}.birdnet_tasks where state != 1'
+        # delete all tasks during development
+        query = f'delete from {crd.db.schema}.birdnet_tasks -- where state != 1'
         self.cursor.execute(query)
         self.connection.commit()
 
-def gen_tasks():
-    for i in range(20):
-        print('fetch')
-        yield i
-
 # TODO: on KeyboardInterrupt: cancel processing, rollback and set task to state 0
 def proc(queue, iolock):
+    connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+    cursor = connection.cursor()
+    birdnet = BirdnetWorker(connection)
     while True:
-        connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-        cursor = connection.cursor()
-        cursor.execute(f'''
+        cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
         update {crd.db.schema}.birdnet_tasks
         set state = 1, pickup_on = now()
         where task_id in (
@@ -164,6 +164,8 @@ def proc(queue, iolock):
         with iolock:
             print(f'processing {task}...')
         # TODO: wrap birdnet inferrence run in try/except/finally and handle success/error
+        birdnet.configure(task[0])
+        birdnet.load_species_list()
         time.sleep(2)
         with iolock:
             print(f'done processing {task}')
@@ -206,11 +208,3 @@ if __name__ == '__main__':
                 print(f'queued {task}')
         pool.close()
         pool.join()
-
-    # for tasks in runner.get_tasks():
-        # ...
-
-    # runner.disconnect()
-    # for task in runner.get_tasks():
-    #     print(task)
-    #     ans = input('continue?')
