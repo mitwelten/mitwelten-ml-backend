@@ -1,5 +1,6 @@
 import sys
 import json
+import argparse
 import psycopg2 as pg
 from psycopg2 import errors
 import multiprocessing as mp
@@ -176,21 +177,35 @@ def proc(queue, iolock):
 
 if __name__ == '__main__':
     # https://stackoverflow.com/questions/43078980/python-multiprocessing-with-generator
+    parser = argparse.ArgumentParser(description='Manage BirdNET tasks')
+    parser.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
+    parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
+    parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
+
+    args = parser.parse_args()
+
     runner = Runner()
 
-    queue = mp.Queue(maxsize=4)
-    iolock = mp.Lock()
-    pool = mp.Pool(4, initializer=proc, initargs=(queue, iolock))
+    if args.reset_queue:
+        runner.reset_queue()
 
-    # wrap this in while loop that slowly checks
-    # for new stuff in the queue after it runs out of tasks
-    for task in range(4):
-        queue.put(task)
-        with iolock:
-            print(f'queued {task}')
+    if args.add_batch is not None:
+        config_id = runner.set_default_config()
+        runner.queue_batch(config_id, args.add_batch)
 
-    pool.close()
-    pool.join()
+    if args.run:
+        queue = mp.Queue(maxsize=4)
+        iolock = mp.Lock()
+        pool = mp.Pool(4, initializer=proc, initargs=(queue, iolock))
+
+        # wrap this in while loop that slowly checks
+        # for new stuff in the queue after it runs out of tasks
+        for task in range(4):
+            queue.put(task)
+            with iolock:
+                print(f'queued {task}')
+        pool.close()
+        pool.join()
 
     # for tasks in runner.get_tasks():
         # ...
