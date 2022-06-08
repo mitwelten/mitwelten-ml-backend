@@ -6,6 +6,8 @@ import multiprocessing as mp
 import time
 import os
 
+from birdnet_batches import batches
+
 sys.path.append('../')
 import credentials as crd
 
@@ -108,14 +110,17 @@ class Runner(object):
         # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
         # https://www.psycopg.org/docs/usage.html#server-side-cursors
 
-    def schedule_tasks(self, config_id):
-        self.cursor.execute('''
-        -- this is an example query
-        insert into {}.birdnet_tasks(file_id, config_id, state, scheduled_on)
-        select file_id, %s, %s, NOW() from {}.birdnet_input
-        where duration >= 3 and sample_rate = 48000 and node_label = %s
-        limit 10
-        '''.format(crd.db.schema, crd.db.schema), (config_id, 0, '3704-8490'))
+    def queue_batch(self, config_id, batch_id = 0):
+        '''Select a batch of files and insert them as tasks into queue'''
+        state = 0
+        query = '''
+        insert into {}.birdnet_tasks(file_id, config_id, state, scheduled_on, batch_id)
+        select file_id, %s, %s, NOW(), %s from ({}) as batch
+        on conflict do nothing -- skip duplicate tasks
+        '''.format(crd.db.schema, batches[batch_id]['query'])
+        self.cursor.execute(query, (config_id, state, batch_id))
+        self.connection.commit()
+        print(f'added {self.cursor.rowcount} tasks for batch "{batches[batch_id]["comment"]}" to queue')
         self.connection.commit()
 
 def gen_tasks():
