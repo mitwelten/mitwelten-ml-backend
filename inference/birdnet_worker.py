@@ -6,12 +6,16 @@
 import sys
 import os
 import re
+import tempfile
 
-from inference.birdnet.config import MIN_CONFIDENCE
+from minio import Minio
+import soundfile as sf
+import numpy as np
+from psycopg2.extras import execute_values
 
 sys.path.append('birdnet')
 import config as cfg
-# import model
+import model
 
 sys.path.append('../')
 import credentials as crd
@@ -20,6 +24,7 @@ import lib.audio as audio
 from birdnet.analyze import loadCodes, loadLabels, predictSpeciesList, loadSpeciesList
 
 SCHEMA = crd.db.schema
+PDEBUG = False
 
 class BirdnetWorker(object):
 
@@ -99,4 +104,128 @@ class BirdnetWorker(object):
             cfg.SPECIES_LIST = loadSpeciesList(cfg.SPECIES_LIST_FILE)
 
     def analyse(self):
-        print(cfg)
+        # TODO: make sure that cfg is isolated between processes
+        # (with 3 tasks it's already confirmed to be isolated)
+        temp_dir = tempfile.TemporaryDirectory()
+        file = None
+
+        try:
+            start, end = 0, cfg.SIG_LENGTH
+            results = {}
+            samples = []
+            timestamps = []
+
+            client = Minio(
+                crd.minio.host,
+                access_key=crd.minio.access_key,
+                secret_key=crd.minio.secret_key,
+            )
+            tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
+            client.fget_object(crd.minio.bucket, self.object_name, tmppath)
+            file = sf.SoundFile(tmppath)
+
+            block_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
+            overlap_seek = int(-cfg.SIG_OVERLAP * cfg.SAMPLE_RATE)
+            last_block = False
+            block_count = 0
+
+            while file.tell() < file.frames:
+                block_count += 1
+                if PDEBUG: print('--begin analysis loop. currently at {:.2f}% ({}s, block {})'.format(file.tell() / file.frames * 100., start, block_count), end='\n')
+
+                if (file.tell() + block_size) > file.frames:
+                    # remaining samples < block size, pad with noise
+                    l = file.frames - file.tell()
+                    split = file.read(l)
+                    sig = np.hstack((split, audio.noise(split, (block_size - len(split)), 0.23)))
+                    last_block = True
+                else:
+                    # read samples from file
+                    sig = file.read(block_size)
+                    if file.tell() == file.frames:
+                        last_block = True
+
+                # Add to batch
+                samples.append(sig)
+                timestamps.append([start, end])
+
+                # Advance start and end
+                start += cfg.SIG_LENGTH - cfg.SIG_OVERLAP
+                end = start + cfg.SIG_LENGTH
+
+                # Check if batch is full or last block
+                if len(samples) < cfg.BATCH_SIZE and not last_block:
+                    continue
+
+                # Predict
+                data = np.array(samples, dtype='float32')
+                prediction = model.predict(data)
+
+                # Logits or sigmoid activations?
+                if cfg.APPLY_SIGMOID:
+                    prediction = model.flat_sigmoid(np.array(prediction), sensitivity=-cfg.SIGMOID_SENSITIVITY)
+
+                # Add to results
+                for i in range(len(samples)):
+
+                    # Get timestamp
+                    s_start, s_end = timestamps[i]
+
+                    # Get prediction
+                    pred = prediction[i]
+
+                    # Assign scores to labels
+                    p_labels = dict(zip(cfg.LABELS, pred))
+
+                    # Store results
+                    results[str(s_start) + '-' + str(s_end)] = p_labels.items()
+
+                # store and clear results after a fixed number of blocks or last block
+                # 1200: fits 60min of (non-overlapping) blocks in one go
+                if block_count % 1200 == 0 or last_block:
+                    if PDEBUG: print(f'storing results at block {block_count}')
+                    if PDEBUG: print('storing results for', self.object_name)
+                    self.saveResultsToDb(results)
+                    results = {}
+                # Clear batch
+                samples = []
+                timestamps = []
+        except:
+            print('error occurred during prediction')
+            # delete results from db
+            self.cursor.execute(f'delete from {SCHEMA}.birdnet_results where task_id = %s', (self.task_id,))
+            self.connection.commit()
+            raise
+        finally:
+            print(f'closing file, removing temp_dir for task {self.task_id}')
+            file.close()
+            temp_dir.cleanup()
+
+    def saveResultsToDb(self, results):
+        insert_query = f'''
+        insert into {SCHEMA}.birdnet_results
+        (task_id, file_id, object_name, time_start, time_end, confidence, species)
+        values %s
+        '''
+        data = []
+        if PDEBUG: print('count of results:', len(results))
+        for timestamp in sorted(results):
+            for c in results[timestamp]:
+                start, end = timestamp.split('-')
+                if c[1] > cfg.MIN_CONFIDENCE and c[0] in cfg.CODES and (c[0] in cfg.SPECIES_LIST or len(cfg.SPECIES_LIST) == 0):
+                    label = cfg.TRANSLATED_LABELS[cfg.LABELS.index(c[0])]
+                    data.append((
+                        self.task_id,
+                        self.file_id,
+                        self.object_name,
+                        float(start),
+                        float(end),
+                        float(c[1]),
+                        label.split('_')[0]))
+        if PDEBUG: print('count of results after filtering:', len(data))
+        try:
+            execute_values(self.cursor, insert_query, data, template=None, page_size=100)
+            self.connection.commit()
+        except:
+            self.connection.rollback()
+            raise

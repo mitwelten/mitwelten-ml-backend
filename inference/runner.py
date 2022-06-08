@@ -161,21 +161,23 @@ def proc(queue, iolock):
         if task == None:
             break
 
-        with iolock:
-            print(f'processing {task}...')
-        # TODO: wrap birdnet inferrence run in try/except/finally and handle success/error
-        birdnet.configure(task[0])
-        birdnet.load_species_list()
-        time.sleep(2)
-        with iolock:
-            print(f'done processing {task}')
-
-        cursor.execute('''
-        update {}.birdnet_tasks
-        set state = 2, end_on = now()
-        where task_id = %s
-        '''.format(crd.db.schema), (task[0],))
-        connection.commit()
+        finish_query = f'''
+            update {crd.db.schema}.birdnet_tasks
+            set state = %s, end_on = now()
+            where task_id = %s
+            '''
+        try:
+            birdnet.configure(task[0])
+            birdnet.load_species_list()
+            birdnet.analyse()
+        except:
+            print(f'task {task[0]} failed')
+            cursor.execute(finish_query, (3, task[0],))
+        else:
+            print(f'task {task[0]} succeeded')
+            cursor.execute(finish_query, (2, task[0],))
+        finally:
+            connection.commit()
 
 if __name__ == '__main__':
     # https://stackoverflow.com/questions/43078980/python-multiprocessing-with-generator
