@@ -121,6 +121,15 @@ class Runner(object):
         self.cursor.execute(query, (config_id, state, batch_id))
         self.connection.commit()
         print(f'added {self.cursor.rowcount} tasks for batch "{batches[batch_id]["comment"]}" to queue')
+
+    def reset_queue(self):
+        '''
+        Clear pending and failed tasks:
+        - Tasks to be kept should throw FK error (results refere to the source task)
+        - Only active tasks shoud be kept
+        '''
+        query = f'delete from {crd.db.schema}.birdnet_tasks where state != 1'
+        self.cursor.execute(query)
         self.connection.commit()
 
 def gen_tasks():
