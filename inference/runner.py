@@ -143,30 +143,27 @@ def proc(queue, iolock):
     cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
 
+    finish_query = f'''
+    update {crd.db.schema}.birdnet_tasks
+    set state = %s, end_on = now()
+    where task_id = %s
+    '''
+
     while True:
         try:
             task = queue.get()
-        except KeyboardInterrupt:
-            break
 
-        try:
             if task == None:
-                print('task is None, break. what now?')
-                break
+                raise
 
-            finish_query = f'''
-                update {crd.db.schema}.birdnet_tasks
-                set state = %s, end_on = now()
-                where task_id = %s
-                '''
             birdnet.configure(task[0])
             birdnet.load_species_list()
             birdnet.analyse()
+
         except KeyboardInterrupt:
             print(f'task {task[0]} failed: KeyboardInterrupt')
             cursor.execute(finish_query, (3, task[0],))
-            connection.commit()
-            break
+            raise Exception('KeyboardInterrupt caught in proc')
         except:
             print(f'task {task[0]} failed')
             cursor.execute(finish_query, (3, task[0],))
@@ -174,9 +171,7 @@ def proc(queue, iolock):
             print(f'task {task[0]} succeeded')
             cursor.execute(finish_query, (2, task[0],))
         finally:
-            print('running finally')
             connection.commit()
-    print('reached bottom')
 
 def tasks(connection):
     cursor = connection.cursor()
@@ -243,6 +238,10 @@ if __name__ == '__main__':
                 for i in range(ncpus):
                     queue.put(None)
                 break
+            except Exception as e:
+                print('something else went wrong.', e)
+                break
+
 
         print('waiting for tasks to end...')
         pool.close()
