@@ -1,9 +1,11 @@
 import sys
 import json
 import argparse
+import traceback
 import psycopg2 as pg
 from psycopg2 import errors
 import multiprocessing as mp
+from queue import Empty as QueueEmpty
 import time
 import os
 
@@ -137,7 +139,6 @@ class Runner(object):
         self.cursor.execute(query)
         self.connection.commit()
 
-# TODO: on KeyboardInterrupt: cancel processing, rollback and set task to state 0
 def proc(queue, iolock):
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = connection.cursor()
@@ -150,20 +151,27 @@ def proc(queue, iolock):
     '''
 
     while True:
+        task = None
+
         try:
             task = queue.get()
+        except KeyboardInterrupt:
+            break
 
-            if task == None:
-                raise
+        if task == None:
+            break
 
+        try:
             birdnet.configure(task[0])
             birdnet.load_species_list()
             birdnet.analyse()
-
         except KeyboardInterrupt:
-            print(f'task {task[0]} failed: KeyboardInterrupt')
+            # let the task fail.
+            # at this point some results may have been written to db,
+            # those also may have already been deleted
             cursor.execute(finish_query, (3, task[0],))
-            raise Exception('KeyboardInterrupt caught in proc')
+            connection.commit()
+            break
         except:
             print(f'task {task[0]} failed')
             cursor.execute(finish_query, (3, task[0],))
@@ -194,13 +202,12 @@ def tasks(connection):
             if task:
                 yield task
             else:
-                print('sleeping...')
+                print('sleeping...', end='\r')
                 time.sleep(10)
         except KeyboardInterrupt:
-            print('stop requested, exiting tasks generator')
             break
         except:
-            print('other error occured, exiting task generator')
+            print(traceback.format_exc(), flush=True)
             break
 
 if __name__ == '__main__':
@@ -226,26 +233,38 @@ if __name__ == '__main__':
         ncpus = os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
         iolock = mp.Lock()
-        pool = mp.Pool(ncpus, initializer=proc, initargs=(queue, iolock))
+        try:
+            pool = mp.Pool(ncpus, initializer=proc, initargs=(queue, iolock))
 
-        for task in tasks(connection):
-            try:
+            for task in tasks(connection):
                 queue.put(task)
 
-            except KeyboardInterrupt:
-                print('signalling tasks to end')
-                print('to cancel running tasks, send another interrupt')
-                for i in range(ncpus):
-                    queue.put(None)
-                break
-            except Exception as e:
-                print('something else went wrong.', e)
-                break
+        except:
+            # anything that is still in queue has not been picked up by workers and can be reset.
+            try:
+                finish_query = f'''
+                update {crd.db.schema}.birdnet_tasks
+                set state = 0, pickup_on = null, end_on = null
+                where task_id = %s
+                '''
+                cursor = connection.cursor()
+                # reset the task that was already yelded but not yet put into the queue
+                cursor.execute(finish_query, (task[0],))
+                while True:
+                    task = queue.get(True, 2)
+                    cursor.execute(finish_query, (task[0],))
+            except QueueEmpty:
+                connection.commit()
+            except:
+                print(traceback.format_exc(), flush=True)
 
+        finally:
+            print('closing queue...')
+            queue.close()
 
-        print('waiting for tasks to end...')
-        pool.close()
-        pool.join()
+            print('waiting for tasks to end...')
+            pool.close()
+            pool.join()
 
         print('cleaning up...')
         connection.close()

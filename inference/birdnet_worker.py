@@ -192,7 +192,7 @@ class BirdnetWorker(object):
                 timestamps = []
         except:
             # delete results from db
-            print(f'error occurred during prediction, deleting results for task {self.task_id}')
+            print(f'error/interrupt occurred during prediction, deleting results for task {self.task_id}')
             self.cursor.execute(f'delete from {SCHEMA}.birdnet_results where task_id = %s', (self.task_id,))
             self.connection.commit()
             raise
