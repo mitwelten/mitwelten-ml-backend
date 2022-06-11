@@ -161,6 +161,18 @@ class Runner(object):
         ''')
         self.connection.commit()
 
+    def reset_failed(self):
+        '''
+        Set failed tasks back to pending, deleting associated result
+        '''
+        self.cursor.execute(f'''
+        delete from {crd.db.schema}.birdnet_results
+            where task_id in (select task_id from {crd.db.schema}.birdnet_tasks where state = 3);
+        update {crd.db.schema}.birdnet_tasks set state = 0 where state = 3;
+        ''')
+        print(f'reset to pending on {self.cursor.rowcount} tasks')
+        self.connection.commit()
+
 def worker(queue,):
     '''Read tasks from queue and process them using BirdnetWorker'''
 
@@ -209,6 +221,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run and manage BirdNET inferrence queue')
     parser.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
+    parser.add_argument('--reset-failed', action='store_true', default=False, help='Reset failed tasks to pending, clearing results')
     parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
     parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
 
@@ -218,6 +231,9 @@ if __name__ == '__main__':
 
     if args.reset_queue:
         runner.reset_queue()
+
+    if args.reset_failed:
+        runner.reset_failed()
 
     if args.add_batch is not None:
         config_id = runner.set_default_config()
