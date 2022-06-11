@@ -152,11 +152,13 @@ class Runner(object):
         '''
         Clear pending and failed tasks:
         - Tasks to be kept should throw FK error (results refere to the source task)
-        - Only active tasks shoud be kept
+        - Only active and completed tasks shoud be kept
         '''
-        # delete all tasks during development
-        query = f'delete from {crd.db.schema}.birdnet_tasks -- where state != 1'
-        self.cursor.execute(query)
+        self.cursor.execute(f'''
+        delete from {crd.db.schema}.birdnet_results
+            where task_id in (select task_id from {crd.db.schema}.birdnet_tasks where state = 3);
+        delete from {crd.db.schema}.birdnet_tasks where state not in (1, 2);
+        ''')
         self.connection.commit()
 
 def proc(queue, iolock):
