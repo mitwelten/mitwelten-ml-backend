@@ -101,20 +101,40 @@ class Runner(object):
         return self.store_config(config, 'default configuration')
 
     def get_tasks(self):
-        query = '''
-        SELECT file_id
-        FROM {}.birdnet_tasks
-        WHERE state = 0
-        LIMIT 2
-        FOR UPDATE SKIP LOCKED
-        '''.format(crd.db.schema)
+        # run on dedicated connection
+        connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+        cursor = connection.cursor()
         while True:
-            self.cursor.execute(query)
-            tasks = self.cursor.fetchall()
-            yield tasks
-        # https://www.postgresql.org/docs/current/explicit-locking.html
-        # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
-        # https://www.psycopg.org/docs/usage.html#server-side-cursors
+            try:
+                # https://www.postgresql.org/docs/current/explicit-locking.html
+                # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
+                cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
+                update {crd.db.schema}.birdnet_tasks
+                set state = 1, pickup_on = now()
+                where task_id in (
+                    select task_id from {crd.db.schema}.birdnet_tasks
+                    where state = 0
+                    order by task_id
+                    for update skip locked
+                    limit 1
+                )
+                returning task_id, file_id, config_id;
+                ''')
+                connection.commit()
+                task = cursor.fetchone()
+                if task:
+                    yield task
+                else:
+                    print('sleeping...', end='\r')
+                    time.sleep(10)
+            except KeyboardInterrupt:
+                break
+            except:
+                print(traceback.format_exc(), flush=True)
+                break
+        cursor.close()
+        connection.close()
+
 
     def queue_batch(self, config_id, batch_id = 0):
         '''Select a batch of files and insert them as tasks into queue'''
@@ -181,35 +201,6 @@ def proc(queue, iolock):
         finally:
             connection.commit()
 
-def tasks(connection):
-    cursor = connection.cursor()
-    while True:
-        try:
-            cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
-            update {crd.db.schema}.birdnet_tasks
-            set state = 1, pickup_on = now()
-            where task_id in (
-                select task_id from {crd.db.schema}.birdnet_tasks
-                where state = 0
-                order by task_id
-                for update skip locked
-                limit 1
-            )
-            returning task_id, file_id, config_id;
-            ''')
-            connection.commit()
-            task = cursor.fetchone()
-            if task:
-                yield task
-            else:
-                print('sleeping...', end='\r')
-                time.sleep(10)
-        except KeyboardInterrupt:
-            break
-        except:
-            print(traceback.format_exc(), flush=True)
-            break
-
 if __name__ == '__main__':
     # https://stackoverflow.com/questions/43078980/python-multiprocessing-with-generator
     parser = argparse.ArgumentParser(description='Manage BirdNET tasks')
@@ -236,7 +227,7 @@ if __name__ == '__main__':
         try:
             pool = mp.Pool(ncpus, initializer=proc, initargs=(queue, iolock))
 
-            for task in tasks(connection):
+            for task in runner.get_tasks():
                 queue.put(task)
 
         except:
