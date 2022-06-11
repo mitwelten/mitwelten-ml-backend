@@ -161,7 +161,9 @@ class Runner(object):
         ''')
         self.connection.commit()
 
-def proc(queue, iolock):
+def worker(queue,):
+    '''Read tasks from queue and process them using BirdnetWorker'''
+
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
@@ -204,8 +206,8 @@ def proc(queue, iolock):
             connection.commit()
 
 if __name__ == '__main__':
-    # https://stackoverflow.com/questions/43078980/python-multiprocessing-with-generator
-    parser = argparse.ArgumentParser(description='Manage BirdNET tasks')
+
+    parser = argparse.ArgumentParser(description='Run and manage BirdNET inferrence queue')
     parser.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
     parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
     parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
@@ -225,9 +227,9 @@ if __name__ == '__main__':
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         ncpus = os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
-        iolock = mp.Lock()
+
         try:
-            pool = mp.Pool(ncpus, initializer=proc, initargs=(queue, iolock))
+            pool = mp.Pool(ncpus, initializer=worker, initargs=(queue,))
 
             for task in runner.get_tasks():
                 queue.put(task)
@@ -241,7 +243,7 @@ if __name__ == '__main__':
                 where task_id = %s
                 '''
                 cursor = connection.cursor()
-                # reset the task that was already yelded but not yet put into the queue
+                # reset the task that was already yielded but not yet put into queue
                 cursor.execute(finish_query, (task[0],))
                 while True:
                     task = queue.get(True, 2)
