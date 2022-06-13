@@ -2,6 +2,7 @@ class DbConfig(object):
     host = ''
     port = 5432
     database = ''
+    schema = 'public'
     user = ''
     password = ''
 

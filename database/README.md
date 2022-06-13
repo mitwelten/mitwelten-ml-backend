@@ -1,4 +1,4 @@
-# Database Setup
+# Database Setup (retired)
 
 In a first step, the database schema was laid out based on the existing data,
 starting with audio files recorded by audiomoths. This produced the schema

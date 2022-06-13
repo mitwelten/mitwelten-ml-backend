@@ -26,7 +26,7 @@ import lib.audio as audio
 # for now, use manual id.
 # don't forget to change it between datasets
 # another option: int(datetime.datetime.now().timestamp())
-SELECTION_ID = 1
+BATCH_ID = 1
 PDEBUG = False
 
 def clearErrorLog():
@@ -41,47 +41,47 @@ def writeErrorLog(msg):
 
 def loadFileSet():
 
-    # SELECTION_ID 1
+    # BATCH_ID 1
     fileset_query = '''
-    select file_id, file_path,
-        floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    from input_files
+    select file_id, object_name,
+        floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+    from {}.birdnet_input
     where duration >= 3 and sample_rate = 48000 and
-        device_id ~ 'AM[12]'
-    order by time_start asc
-    '''
+        node_label ~ 'AM[12]'
+    order by time asc
+    '''.format(crd.db.schema)
 
-    # # SELECTION_ID 2
+    # # BATCH_ID 2
     # fileset_query = '''
-    # select file_id, file_path,
-    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    # from input_files
+    # select file_id, object_name,
+    #     floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+    # from {}.birdnet_input
     # where duration >= 3 and sample_rate = 48000 and
-    #     device_id = '6444-8804'
-    # order by time_start asc
-    # '''
+    #     node_label = '6444-8804'
+    # order by time asc
+    # '''.format(crd.db.schema)
 
-    # # SELECTION_ID 3
+    # # BATCH_ID 3
     # fileset_query = '''
-    # select file_id, file_path,
-    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    # from input_files
+    # select file_id, object_name,
+    #     floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+    # from {}.birdnet_input
     # where duration >= 3 and sample_rate = 48000 and
-    #     device_id = '4258-6870'
-    # order by time_start asc
-    # '''
+    #     node_label = '4258-6870'
+    # order by time asc
+    # '''.format(crd.db.schema)
 
-    # # SELECTION_ID 4
+    # # BATCH_ID 4
     # fileset_query = '''
-    # select file_id, file_path,
-    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    # from input_files
+    # select file_id, object_name,
+    #     floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+    # from {}.birdnet_input
     # where duration >= 3 and sample_rate = 48000 and
-    #     device_id = '3704-8490'
-    # order by time_start asc
-    # '''
+    #     node_label = '3704-8490'
+    # order by time asc
+    # '''.format(crd.db.schema)
 
-    # SELECTION_ID 5
+    # BATCH_ID 5
     # a.k.a. the ultimate birdnet query
     # all files that:
     # - don't show up in results
@@ -90,13 +90,13 @@ def loadFileSet():
     # - filesize < 1100MB
 
     # fileset_query = '''
-    # select file_id, file_path,
-    #     floor((extract(doy from time_start) - 1)/(365/48.))::integer + 1 as week
-    # from input_files
+    # select file_id, object_name,
+    #     floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+    # from {}.birdnet_input i
     # where sample_rate = 48000 and duration >= 3 and not exists (
-    #     select from results where object_name = file_path
+    #     select from {}.birdnet_results o where i.object_name = o.object_name
     # )
-    # '''
+    # '''.format(crd.db.schema, crd.db.schema)
 
     pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = pg_server.cursor()
@@ -160,9 +160,9 @@ def predictSpeciesLists():
 def saveResultsToDb(f_id, object_name, r):
     insert_query = '''
     insert into
-    results(file_id, object_name, time_start, time_end, confidence, species, selection_id)
+    {}.birdnet_results(file_id, object_name, time_start, time_end, confidence, species)
     values %s
-    '''
+    '''.format(crd.db.schema)
 
     pg_server = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = pg_server.cursor()
@@ -180,8 +180,7 @@ def saveResultsToDb(f_id, object_name, r):
                     float(start),
                     float(end),
                     float(c[1]),
-                    label.split('_')[0],
-                    SELECTION_ID))
+                    label.split('_')[0]))
 
     if PDEBUG: print('count of results after filtering:', len(data))
     execute_values(cursor, insert_query, data, template=None, page_size=100)

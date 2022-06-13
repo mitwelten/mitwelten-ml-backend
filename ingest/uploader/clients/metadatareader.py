@@ -9,6 +9,8 @@ from os.path import basename, dirname
 import mimetypes
 from PyQt5.QtCore import QThread, pyqtSignal
 
+import credentials as crd
+
 BS = 65536
 
 rec_nok_str = {
@@ -25,11 +27,11 @@ class MetaDataReader(QThread):
     totalChanged = pyqtSignal(int)
     extractFinished = pyqtSignal(list)
 
-    def __init__(self, dbConnectionPool, path, device_id):
+    def __init__(self, dbConnectionPool, path, node_label):
         QThread.__init__(self)
         self.dbConnectionPool = dbConnectionPool
         self.path = path
-        self.device_id = device_id
+        self.node_label = node_label
 
     def run(self):
         audiofiles = []
@@ -66,7 +68,7 @@ class MetaDataReader(QThread):
             audiofiles[i] = self.extract_meta(audiofiles[i])
             audiofiles[i]['row_id'] = i
             audiofiles[i]['row_state'] = -1 # -1:no state, 0:OK, 1:error
-            audiofiles[i]['device_id'] = self.device_id
+            audiofiles[i]['node_label'] = self.node_label
             audiofiles[i]['comment'] = None
             audiofiles[i]['duplicate_check'] = self.checkDuplicate(cursor, audiofiles[i])
             self.countChanged.emit(i+1, audiofiles[i]['original_file_path'])
@@ -79,7 +81,7 @@ class MetaDataReader(QThread):
         if len(result) == 2:
             return f'{result[0]}-{result[1]}'
         else:
-            raise ValueError(f'{arg}: Incorrect format for ID (0000-0000)')
+            raise ValueError(f'{arg}: Incorrect format for node label (0000-0000)')
 
     def is_readable_dir(self, arg):
         try:
@@ -96,14 +98,16 @@ class MetaDataReader(QThread):
         query = '''
         WITH n AS (
             SELECT %s as sha256,
-            %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||'.wav' as file_name
+            %s||'/'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD/HH24/') -- file_path (node_label, time_start)
+            || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s -- file_name (node_label, time_start, extension)
+            as object_name
         )
         SELECT f.sha256 = n.sha256 as hash_match,
-            f.file_name = n.file_name as file_match
-        from files f, n where state = 'uploaded' and
-            (f.sha256 = n.sha256 or f.file_name = n.file_name)
-        '''
-        cursor.execute(query, (item['sha256'], item['device_id'], item['time_start']))
+            f.object_name = n.object_name as object_name_match
+        from {}.files_audio f, n
+        where (f.sha256 = n.sha256 or f.object_name = n.object_name)
+        '''.format(crd.db.schema)
+        cursor.execute(query, (item['sha256'], item['node_label'], item['time_start'], item['node_label'], item['time_start'], '.wav'))
         result = cursor.fetchone()
         if result is None:
             result = (False, False)
@@ -126,7 +130,6 @@ class MetaDataReader(QThread):
         comment = meta.tags.comment[0]
 
         info['original_file_path'] = path
-        info['original_file_name'] = basename(path)
         info['filesize'] = meta.filesize
         info['audio_format'] = meta.streaminfo.audio_format
         info['bit_depth'] = meta.streaminfo.bit_depth
@@ -134,6 +137,8 @@ class MetaDataReader(QThread):
         info['duration'] = meta.streaminfo.duration
         info['sample_rate'] = meta.streaminfo.sample_rate
 
+        if 'text' in comment:
+            comment = comment['text']
         # Read the time and timezone from the header
         ts = re.search(r"(\d\d:\d\d:\d\d \d\d/\d\d/\d\d\d\d)", comment)[1]
         tz = re.search(r"\(UTC([-|+]\d+)?:?(\d\d)?\)", comment)

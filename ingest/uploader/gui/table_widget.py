@@ -11,7 +11,7 @@ import credentials as crd
 from clients import MetaDataReader, UploadClient
 from . import CustomTableModel
 
-device_ids = [
+node_labels = [
     '0000-0000', # undefined
     '0863-3235',
     '1874-8542',
@@ -35,7 +35,7 @@ class Widget(QWidget):
 
         self.dbPool = None
         self.file = ''
-        self.device_id = '0000-0000'
+        self.node_label = '0000-0000'
 
         # Getting the Model
         self.model = CustomTableModel()
@@ -62,11 +62,11 @@ class Widget(QWidget):
         size.setVerticalStretch(1)
         self.table_view.setSizePolicy(size)
 
-        # select box for device_id
+        # select box for node_label
         self.cb = QComboBox()
-        self.cb.addItems(device_ids)
+        self.cb.addItems(node_labels)
         self.cb.currentIndexChanged.connect(self.onSelectionChange)
-        self.selector_layout.addWidget(QLabel('SD-Card ID:'))
+        self.selector_layout.addWidget(QLabel('SD-Card/Node Label:'))
         self.selector_layout.addWidget(self.cb)
         self.selector_layout.addStretch()
 
@@ -87,7 +87,7 @@ class Widget(QWidget):
         self.bottom_layout.addWidget(buttonBox)
 
         # create status label
-        self.statusLabel = QLabel('First, select the SD-Card ID')
+        self.statusLabel = QLabel('First, select the SD-Card/Node Label')
         self.bottom_layout.addWidget(self.statusLabel)
 
         # pbtest
@@ -104,8 +104,8 @@ class Widget(QWidget):
         self.setLayout(self.main_layout)
 
     def onSelectionChange(self):
-        self.device_id = self.cb.currentText()
-        if self.device_id != '0000-0000':
+        self.node_label = self.cb.currentText()
+        if self.node_label != '0000-0000':
             self.importButton.setEnabled(True)
         else:
             self.importButton.setEnabled(False)
@@ -153,7 +153,7 @@ class Widget(QWidget):
             self.browseForSource()
 
         self.pbar.setValue(0)
-        self.metareader = MetaDataReader(self.dbPool, self.file, self.device_id)
+        self.metareader = MetaDataReader(self.dbPool, self.file, self.node_label)
         self.metareader.totalChanged.connect(lambda total: self.pbar.setMaximum(total))
         self.metareader.countChanged.connect(self.onExtractIteration)
         self.metareader.extractFinished.connect(self.onExtractFinished)
