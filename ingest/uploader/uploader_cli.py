@@ -265,11 +265,19 @@ def is_readable_dir(arg):
     except Exception as e:
         raise ValueError(f'Can\'t read directory/file {arg}')
 
+def chunks(lst, n):
+    '''Yield successive n-sized chunks from lst.'''
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n], i
+
 def main():
     parser = argparse.ArgumentParser(description='Upload image files to DB and minIO')
     parser.add_argument('--threads', help='number of threads to spawn', default=4)
+    parser.add_argument('--batchsize', help='number of files to process as batch', default=1024)
     parser.add_argument('path', type=lambda x: is_readable_dir(x), help='path to files', nargs=1)
     args = parser.parse_args()
+
+    BATCHSIZE = max(1, min(16384, int(args.batchsize)))
 
     # connect to DB
     global dbConnectionPool
@@ -307,23 +315,30 @@ def main():
     # build file tree
     imagefiles, audiofiles, textfiles = build_file_lists(args.path[0])
 
-    # get image metadata and filter duplicates
-    imagefiles = extract_image_meta(imagefiles)
+    for batch, i in chunks(imagefiles, BATCHSIZE):
+        print('\n== processing batch', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
 
-    # check image duplicates in DB
-    # duplicate check and upload is seperate to preemtivly check for errors
-    imagefiles = check_image_duplicates(imagefiles)
+        # get image metadata and filter duplicates
+        batch = extract_image_meta(batch)
 
-    update_nodes(imagefiles, 'cam')
+        # check image duplicates in DB
+        # duplicate check and upload is seperate to preemtivly checking for errors
+        batch = check_image_duplicates(batch)
 
-    # upload files
-    if len(imagefiles) > 0:
-        print('uploading files to db and storage...')
-        thread_map(image_upload_worker, imagefiles, max_workers=args.threads)
-        print('done')
+        update_nodes(batch, 'cam')
+
+        # upload files
+        if len(batch) > 0:
+            print('uploading files to db and storage...')
+            thread_map(image_upload_worker, batch, max_workers=args.threads)
+            print('done')
 
     # close connections in pool
     dbConnectionPool.closeall()
 
 if __name__ == '__main__':
     main()
+
+# TODO: batchweiser test/metaextract/upload
+# Access Points: bilder hochladen über die Nacht (cronjob)
+# - erfordert __endpoint__ für db checks und inserts
