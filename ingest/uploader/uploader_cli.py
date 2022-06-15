@@ -26,7 +26,7 @@ logger = None
 
 BS = 65536
 
-def image_meta_worker(path, progress):
+def image_meta_worker(path):
 
     # from filename: node_label, timestamp
     # from exif: resolution
@@ -55,6 +55,7 @@ def image_meta_worker(path, progress):
         meta['sha256'] = file_hash.hexdigest()
 
         meta['file_size'] = os.stat(path).st_size
+        meta['path'] = path
         meta['file_name'] = os.path.basename(path)
         # 0344-6782_2021-07-03T12-13-46Z.jpg
         fnparts = re.search(r'(\d{4}-\d{4})_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)\.jpe?g', meta['file_name'])
@@ -64,7 +65,7 @@ def image_meta_worker(path, progress):
         else:
             raise ValueError(f"Error parsing filename for node label and timestamp: {meta['file_name']}", )
     except Exception as e:
-        progress.write(f'{path}: {e}')
+        print(f'{path}: {e}')
         meta = None
 
     return meta
@@ -174,19 +175,20 @@ def build_file_lists(basepath):
 
 def extract_image_meta(imagefiles):
     print('extracting metadata for image files...')
+    metalist = thread_map(image_meta_worker, imagefiles, max_workers=NTHREADS)
+
+    print('locally checking for duplicate hashes...')
     hashtable = {}
     progress = tqdm(total=len(imagefiles))
-    for path in imagefiles:
-        meta = image_meta_worker(path, progress)
+    for meta in metalist:
         progress.update(1)
         if not meta: continue
         if meta['sha256'] in hashtable:
             progress.write('duplicate hash in file', hashtable[meta['sha256']]['path'])
             if hashtable[meta['sha256']]['timestamp'] != meta['timestamp']:
                 progress.write('timestamp mismatch, please fix')
-            progress.write('skipping', path)
+            progress.write('skipping', meta['path'])
         else:
-            meta['path'] = path
             hashtable[meta['sha256']] = meta
     progress.close()
     print(f'extracted metadata, found {len(hashtable)} unique image files')
@@ -272,11 +274,13 @@ def chunks(lst, n):
 
 def main():
     parser = argparse.ArgumentParser(description='Upload image files to DB and minIO')
-    parser.add_argument('--threads', help='number of threads to spawn', default=4)
+    parser.add_argument('--threads', help='number of threads to spawn', default=os.cpu_count())
     parser.add_argument('--batchsize', help='number of files to process as batch', default=1024)
     parser.add_argument('path', type=lambda x: is_readable_dir(x), help='path to files', nargs=1)
     args = parser.parse_args()
 
+    global NTHREADS
+    NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
     BATCHSIZE = max(1, min(16384, int(args.batchsize)))
 
     # connect to DB
