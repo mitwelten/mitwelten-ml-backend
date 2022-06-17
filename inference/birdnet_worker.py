@@ -203,7 +203,7 @@ class BirdnetWorker(object):
     def saveResultsToDb(self, results):
         insert_query = f'''
         insert into {SCHEMA}.birdnet_results
-        (task_id, file_id, object_name, time_start, time_end, confidence, species)
+        (task_id, file_id, time_start, time_end, confidence, species)
         values %s
         '''
         data = []
@@ -216,7 +216,6 @@ class BirdnetWorker(object):
                     data.append((
                         self.task_id,
                         self.file_id,
-                        self.object_name,
                         float(start),
                         float(end),
                         float(c[1]),
