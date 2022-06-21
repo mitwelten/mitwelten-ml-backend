@@ -334,7 +334,7 @@ def main():
         # upload files
         if len(batch) > 0:
             print('uploading files to db and storage...')
-            thread_map(image_upload_worker, batch, max_workers=args.threads)
+            thread_map(image_upload_worker, batch, max_workers=max(1, min(16, NTHREADS)))
             print('done')
 
     # close connections in pool
