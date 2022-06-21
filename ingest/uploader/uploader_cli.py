@@ -286,7 +286,7 @@ def main():
     # connect to DB
     global dbConnectionPool
     dbConnectionPool = pg.pool.ThreadedConnectionPool(
-        5, 20,
+        NTHREADS, 42,
         host=crd.db.host,
         port=crd.db.port,
         database=crd.db.database,
