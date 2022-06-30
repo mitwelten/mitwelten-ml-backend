@@ -3,3 +3,4 @@ build
 dist
 credentials.py
 *.log
+file_index.db
