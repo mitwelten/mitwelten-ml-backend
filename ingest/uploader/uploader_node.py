@@ -16,7 +16,13 @@ from minio import Minio
 from minio.commonconfig import Tags
 from PIL import Image
 
+sys.path.append('../../')
+import credentials as crd
+
 BS = 65536
+
+class MetadataInsertException(BaseException):
+    ...
 
 def is_readable_dir(arg):
     try:
@@ -189,26 +195,99 @@ def main():
         return
 
     if args.upload:
+        # connect to S3 storage
+        storage = Minio(
+            crd.minio.host,
+            access_key=crd.minio.access_key,
+            secret_key=crd.minio.secret_key,
+        )
+        bucket_exists = storage.bucket_exists(crd.minio.bucket)
+        if not bucket_exists:
+            raise Exception(f'Bucket {crd.minio.bucket} does not exist.')
         cols = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
-        records = c.execute(f'select {",".join(cols)} from files where state = 1 limit 3').fetchall()
+        records = c.execute(f'select {",".join(cols)} from files where state = 1 limit 1').fetchall()
 
         for r in records:
             d = {k: r[i] for (i,k) in enumerate(cols)}
-            # pprint( { k: d[k] for k in ('sha256', 'path')} )
-            r = requests.post('http://localhost:8000/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
-            validation = r.json()
-            if validation['hash_match'] or validation['object_name_match']:
-                print('file exists in database:', d['path'])
-                # c.execute('update files set state = -3 where file_id = ?', [d['file_id']])
-                # database.commit()
-            else:
-                print('new file:', d['path'])
+
+            # validate record against database
+            try:
+                r = requests.post('http://localhost:8000/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
+                validation = r.json()
+
+                if r.status_code != 200:
+                    raise Exception(f"failed to insert metadata for {d['path']}: {validation['detail']}")
+
+                if validation['hash_match'] or validation['object_name_match']:
+                    c.execute('update files set state = -3 where file_id = ?', [d['file_id']])
+                    database.commit()
+                    raise Exception('file exists in database:', d['path'])
+                elif validation['node_deployed'] == False:
+                    c.execute('update files set state = -6 where file_id = ?', [d['file_id']])
+                    database.commit()
+                    raise Exception('node is not deployed:', d['node_label'])
+                else:
+                    print('new file:', validation['object_name'])
+                    d['object_name'] = validation['object_name']
+                    d['node_id']     = validation['node_id']
+                    d['location_id'] = validation['location_id']
+
+            except Exception as e:
+                print('Validation failed:', str(e))
+                continue
 
             # do the upload here
+            try:
 
-            # write to db
-            d['resolution'] = (d['resolution_x'], d['resolution_y'])
-            r = requests.post('http://localhost:8000/ingest/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp', 'file_size', 'resolution')})
+                # upload to minio S3
+                tags = Tags(for_object=True)
+                tags['node_label'] = str(d['node_label'])
+                upload = storage.fput_object(crd.minio.bucket, d['object_name'], d['path'],
+                    content_type='image/jpeg', tags=tags)
+
+                # store upload status
+                c.execute('''
+                update files set (state, file_uploaded_at) = (2, strftime('%s'))
+                where file_id = ?
+                ''', [d['file_id']])
+                database.commit()
+                print(f'created {upload.object_name}; etag: {upload.etag}')
+
+                # store metadata in postgres
+                d['resolution'] = (d['resolution_x'], d['resolution_y'])
+                r = requests.post('http://localhost:8000/ingest/image', json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id', 'location_id', 'timestamp', 'file_size', 'resolution')})
+
+                if r.status_code != 200:
+                    raise MetadataInsertException(f"failed to insert metadata for {d['path']}: {r.json()['detail']}")
+
+                # store metadata status
+                c.execute('''
+                update files set (state, meta_uploaded_at) = (2, strftime('%s'))
+                where file_id = ?
+                ''', [d['file_id']])
+                database.commit()
+                print('inserted metadata into database. done.')
+
+            except MetadataInsertException as e:
+                # -5: meta insert error
+                print('MetadataInsertException', str(e))
+                c.execute('''
+                update files set (state, file_uploaded_at) = (-5, strftime('%s'))
+                where file_id = ?
+                ''', [d['file_id']])
+                database.commit()
+
+            except:
+                # -4: file upload error
+                print('File upload error', str(e))
+                c.execute('''
+                update files set (state, file_uploaded_at) = (-4, strftime('%s'))
+                where file_id = ?
+                ''', [d['file_id']])
+                database.commit()
+                # logger.error(traceback.format_exc())
+                # logger.error('failed uploading: deleting record from db')
+                # query = 'DELETE FROM {}.files_image WHERE file_id = %s'.format(crd.db.schema)
 
     database.close()
 
