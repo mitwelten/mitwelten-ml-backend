@@ -285,7 +285,7 @@ def main():
     parser = argparse.ArgumentParser(description='Build file index')
     parser.add_argument('--threads', help='number of threads to spawn', default=4)
     parser.add_argument('--index', type=lambda x: is_readable_dir(x), help='index files in argument INDEX')
-    parser.add_argument('--hash', action='store_true', help='calculate files hashes')
+    parser.add_argument('--meta', action='store_true', help='check files and extract and metadata')
     parser.add_argument('--upload', action='store_true', help='upload hashed files')
     parser.add_argument('--test', action='store_true', help='select some records')
 
@@ -329,7 +329,7 @@ def main():
             ''',[(path,) for path in batch])
             database.commit()
 
-    if args.hash:
+    if args.meta:
         records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
         for batch, i in chunks(records, BATCHSIZE):
