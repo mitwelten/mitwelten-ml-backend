@@ -358,7 +358,6 @@ def main():
                     where file_id = ?
                     ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
             database.commit()
-        return
 
     if args.upload:
 
