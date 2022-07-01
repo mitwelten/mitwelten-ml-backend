@@ -1,5 +1,7 @@
 import hashlib
 import logging
+import time
+import traceback
 import argparse
 import mimetypes
 import os
@@ -8,6 +10,8 @@ import re
 from datetime import datetime, timezone
 import sqlite3
 import requests
+from multiprocessing.pool import ThreadPool
+from queue import Queue, Empty as QueueEmpty
 
 from tqdm.contrib.concurrent import thread_map
 from minio import Minio
@@ -17,6 +21,10 @@ from PIL import Image
 import credentials as crd
 
 BS = 65536
+APIURL = crd.api.url
+# APIURL = 'http://localhost:8000'
+COLS = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
+
 
 class MetadataInsertException(BaseException):
     ...
@@ -112,6 +120,167 @@ def image_meta_worker(row):
         meta['path'] = path
     return meta
 
+def worker(queue: Queue):
+
+    conn = sqlite3.connect('file_index.db')
+
+    while True:
+
+        record = None
+        try:
+            record = queue.get()
+        except KeyboardInterrupt:
+            break # ?
+        except:
+            print('Exiting thread, queue is empty') # ?
+            break
+        if record == None:
+            queue.task_done()
+            break
+
+        cur = conn.cursor()
+
+        # connect to S3 storage
+        storage = Minio(
+            crd.minio.host,
+            access_key=crd.minio.access_key,
+            secret_key=crd.minio.secret_key,
+        )
+        bucket_exists = storage.bucket_exists(crd.minio.bucket)
+        if not bucket_exists:
+            print(f'Bucket {crd.minio.bucket} does not exist.')
+            cur.close()
+            # TODO: retry in 10 minutes, task is not done
+            # TODO: check if other exceptions are raised
+            break
+
+        # set up session for REST backend
+        api = requests.Session()
+        api.auth = (crd.api.username, crd.api.password)
+        try:
+            r = api.get(f'{APIURL}/login')
+            r.raise_for_status()
+        except Exception as e:
+            print('Connecting to REST backend failed:', str(e))
+            cur.close()
+            # TODO: retry in 10 minutes, task is not done
+            break
+
+        d = record
+
+        # validate record against database
+        try:
+            r = api.post(f'{APIURL}/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
+            validation = r.json()
+
+            if r.status_code != 200:
+                raise Exception(f"failed to insert metadata for {d['path']}: {validation['detail']}")
+
+            if validation['hash_match'] or validation['object_name_match']:
+                cur.execute('update files set state = -3 where file_id = ?', [d['file_id']])
+                conn.commit()
+                raise Exception('file exists in database:', d['path'])
+            elif validation['node_deployed'] == False:
+                cur.execute('update files set state = -6 where file_id = ?', [d['file_id']])
+                conn.commit()
+                raise Exception('node is not deployed requested time:', d['node_label'], d['timestamp'].isoformat())
+            else:
+                print('new file:', validation['object_name'])
+                d['object_name'] = validation['object_name']
+                d['node_id']     = validation['node_id']
+                d['location_id'] = validation['location_id']
+
+        except Exception as e:
+            print('Validation failed:', str(e))
+            cur.close()
+            queue.task_done()
+            continue
+
+        # upload procedure
+        try:
+
+            # upload to minio S3
+            tags = Tags(for_object=True)
+            tags['node_label'] = str(d['node_label'])
+            upload = storage.fput_object(crd.minio.bucket, d['object_name'], d['path'],
+                content_type='image/jpeg', tags=tags)
+
+            # store upload status
+            cur.execute('''
+            update files set (state, file_uploaded_at) = (2, strftime('%s'))
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+            print(f'created {upload.object_name}; etag: {upload.etag}')
+
+            # store metadata in postgres
+            d['resolution'] = (d['resolution_x'], d['resolution_y'])
+            r = api.post(f'{APIURL}/ingest/image',
+                json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id',
+                    'location_id', 'timestamp', 'file_size', 'resolution')})
+
+            if r.status_code != 200:
+                raise MetadataInsertException(f"failed to insert metadata for {d['path']}: {r.json()['detail']}")
+
+            # store metadata status
+            cur.execute('''
+            update files set (state, meta_uploaded_at) = (2, strftime('%s'))
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+            print('inserted metadata into database. done.')
+
+        except MetadataInsertException as e:
+            # -5: meta insert error
+            print('MetadataInsertException', str(e))
+            cur.execute('''
+            update files set (state, file_uploaded_at) = (-5, strftime('%s'))
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+            cur.close()
+
+        except Exception as e:
+            # -4: file upload error
+            print('File upload error', str(e))
+            cur.execute('''
+            update files set (state, file_uploaded_at) = (-4, strftime('%s'))
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+            cur.close()
+            # TODO: implement logger
+            # logger.error(traceback.format_exc())
+            # logger.error('failed uploading: deleting record from db')
+            # query = 'DELETE FROM {}.files_image WHERE file_id = %s'.format(crd.db.schema)
+        queue.task_done()
+    conn.close()
+
+def get_tasks(conn: sqlite3.Connection):
+    while True:
+        try:
+            c = conn.cursor()
+            r = c.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
+
+            d = {}
+            if r:
+                d = {k: r[i] for (i,k) in enumerate(COLS)}
+                c.execute('update files set state = 3 where file_id = ?', [d['file_id']])
+                conn.commit()
+                c.close()
+                yield d
+            else:
+                c.close()
+                print('sleeping...', end='\r')
+                time.sleep(10)
+        except KeyboardInterrupt:
+            c.close()
+            raise Exception('KeyboardInterrupt')
+        except:
+            c.close()
+            print(traceback.format_exc(), flush=True)
+            raise
+
 def main():
     parser = argparse.ArgumentParser(description='Build file index')
     parser.add_argument('--threads', help='number of threads to spawn', default=4)
@@ -125,8 +294,6 @@ def main():
 
     NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
     BATCHSIZE = max(1, min(16384, int(args.batchsize)))
-    # APIURL = 'http://localhost:8000'
-    APIURL = crd.api.url
 
     database = sqlite3.connect('file_index.db')
     c = database.cursor()
@@ -195,111 +362,41 @@ def main():
 
     if args.upload:
 
-        # connect to S3 storage
-        storage = Minio(
-            crd.minio.host,
-            access_key=crd.minio.access_key,
-            secret_key=crd.minio.secret_key,
-        )
-        bucket_exists = storage.bucket_exists(crd.minio.bucket)
-        if not bucket_exists:
-            raise Exception(f'Bucket {crd.minio.bucket} does not exist.')
+        # make a queue that yields records marked as 'in progress' (status = 3?)
+        ncpus = os.cpu_count()
+        queue = Queue(maxsize=ncpus)
 
-        # set up session for REST backend
-        api = requests.Session()
-        api.auth = (crd.api.username, crd.api.password)
         try:
-            r = api.get(f'{APIURL}/login')
-            r.raise_for_status()
+            pool = ThreadPool(ncpus, initializer=worker, initargs=(queue,))
+
+            for task in get_tasks(database):
+                queue.put(task)
         except Exception as e:
-            print('Connecting to REST backend failed:', str(e))
-            return
+            print('Exiting queue:', e)
 
-        # get local records
-        cols = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
-        records = c.execute(f'select {",".join(cols)} from files where state = 1 limit 1').fetchall()
-
-        for r in records:
-            d = {k: r[i] for (i,k) in enumerate(cols)}
-
-            # validate record against database
             try:
-                r = api.post(f'{APIURL}/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
-                validation = r.json()
-
-                if r.status_code != 200:
-                    raise Exception(f"failed to insert metadata for {d['path']}: {validation['detail']}")
-
-                if validation['hash_match'] or validation['object_name_match']:
-                    c.execute('update files set state = -3 where file_id = ?', [d['file_id']])
-                    database.commit()
-                    raise Exception('file exists in database:', d['path'])
-                elif validation['node_deployed'] == False:
-                    c.execute('update files set state = -6 where file_id = ?', [d['file_id']])
-                    database.commit()
-                    raise Exception('node is not deployed:', d['node_label'])
-                else:
-                    print('new file:', validation['object_name'])
-                    d['object_name'] = validation['object_name']
-                    d['node_id']     = validation['node_id']
-                    d['location_id'] = validation['location_id']
-
-            except Exception as e:
-                print('Validation failed:', str(e))
-                continue
-
-            # do the upload here
-            try:
-
-                # upload to minio S3
-                tags = Tags(for_object=True)
-                tags['node_label'] = str(d['node_label'])
-                upload = storage.fput_object(crd.minio.bucket, d['object_name'], d['path'],
-                    content_type='image/jpeg', tags=tags)
-
-                # store upload status
-                c.execute('''
-                update files set (state, file_uploaded_at) = (2, strftime('%s'))
-                where file_id = ?
-                ''', [d['file_id']])
+                while True:
+                    task = queue.get(True, 2)
+                    print('task from q', task)
+                    c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
+            except QueueEmpty:
                 database.commit()
-                print(f'created {upload.object_name}; etag: {upload.etag}')
-
-                # store metadata in postgres
-                d['resolution'] = (d['resolution_x'], d['resolution_y'])
-                r = api.post(f'{APIURL}/ingest/image', json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id', 'location_id', 'timestamp', 'file_size', 'resolution')})
-
-                if r.status_code != 200:
-                    raise MetadataInsertException(f"failed to insert metadata for {d['path']}: {r.json()['detail']}")
-
-                # store metadata status
-                c.execute('''
-                update files set (state, meta_uploaded_at) = (2, strftime('%s'))
-                where file_id = ?
-                ''', [d['file_id']])
-                database.commit()
-                print('inserted metadata into database. done.')
-
-            except MetadataInsertException as e:
-                # -5: meta insert error
-                print('MetadataInsertException', str(e))
-                c.execute('''
-                update files set (state, file_uploaded_at) = (-5, strftime('%s'))
-                where file_id = ?
-                ''', [d['file_id']])
-                database.commit()
-
             except:
-                # -4: file upload error
-                print('File upload error', str(e))
-                c.execute('''
-                update files set (state, file_uploaded_at) = (-4, strftime('%s'))
-                where file_id = ?
-                ''', [d['file_id']])
-                database.commit()
-                # logger.error(traceback.format_exc())
-                # logger.error('failed uploading: deleting record from db')
-                # query = 'DELETE FROM {}.files_image WHERE file_id = %s'.format(crd.db.schema)
+                print(traceback.format_exc(), flush=True)
+
+        finally:
+            print('signaling threads to stop...')
+            for n in range(ncpus):
+                queue.put(None)
+
+            print('closing queue...')
+            queue.join()
+
+            print('waiting for tasks to end...')
+            pool.close()
+            pool.join()
+
+            print('done.')
 
     database.close()
 
