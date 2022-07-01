@@ -389,7 +389,7 @@ def main():
 
         finally:
             print('signaling threads to stop...')
-            for n in range(ncpus):
+            for n in range(NTHREADS):
                 queue.put(None)
 
             print('closing queue...')
