@@ -111,6 +111,7 @@ def image_meta_worker(row):
 
 def main():
     parser = argparse.ArgumentParser(description='Build file index')
+    parser.add_argument('--threads', help='number of threads to spawn', default=4)
     parser.add_argument('--index', type=lambda x: is_readable_dir(x), help='index files in argument INDEX')
     parser.add_argument('--hash', action='store_true', help='calculate files hashes')
     parser.add_argument('--upload', action='store_true', help='upload hashed files')
@@ -119,6 +120,7 @@ def main():
     parser.add_argument('--batchsize', help='number of files to process as batch', default=1024)
     args = parser.parse_args()
 
+    NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
     BATCHSIZE = max(1, min(16384, int(args.batchsize)))
 
     database = sqlite3.connect('file_index.db')
@@ -160,7 +162,7 @@ def main():
 
         for batch, i in chunks(records, BATCHSIZE):
             print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
-            metalist = thread_map(image_meta_worker, batch, max_workers=4)
+            metalist = thread_map(image_meta_worker, batch, max_workers=NTHREADS)
             print('\n== writing batch to database...')
             for meta in metalist:
                 try:
