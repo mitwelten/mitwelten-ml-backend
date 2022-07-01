@@ -287,13 +287,15 @@ def get_tasks(conn: sqlite3.Connection):
 
 def main():
     parser = argparse.ArgumentParser(description='Build file index')
-    parser.add_argument('--threads', help='number of threads to spawn', default=4)
+
     parser.add_argument('--index', type=lambda x: is_readable_dir(x), help='index files in path INDEX')
     parser.add_argument('--meta', action='store_true', help='check files and extract and metadata')
     parser.add_argument('--upload', action='store_true', help='upload checked files')
     parser.add_argument('--test', action='store_true', help='select some records')
 
+    parser.add_argument('--threads', help='number of threads to spawn', default=4)
     parser.add_argument('--batchsize', help='number of files to process as batch', default=1024)
+
     args = parser.parse_args()
 
     NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
