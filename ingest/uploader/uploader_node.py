@@ -5,8 +5,6 @@ import mimetypes
 import os
 from pprint import pprint
 import re
-import sys
-import traceback
 from datetime import datetime, timezone
 import sqlite3
 import requests
@@ -16,7 +14,6 @@ from minio import Minio
 from minio.commonconfig import Tags
 from PIL import Image
 
-sys.path.append('../../')
 import credentials as crd
 
 BS = 65536
@@ -128,6 +125,8 @@ def main():
 
     NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
     BATCHSIZE = max(1, min(16384, int(args.batchsize)))
+    # APIURL = 'http://localhost:8000'
+    APIURL = crd.api.url
 
     database = sqlite3.connect('file_index.db')
     c = database.cursor()
@@ -195,6 +194,7 @@ def main():
         return
 
     if args.upload:
+
         # connect to S3 storage
         storage = Minio(
             crd.minio.host,
@@ -204,6 +204,18 @@ def main():
         bucket_exists = storage.bucket_exists(crd.minio.bucket)
         if not bucket_exists:
             raise Exception(f'Bucket {crd.minio.bucket} does not exist.')
+
+        # set up session for REST backend
+        api = requests.Session()
+        api.auth = (crd.api.username, crd.api.password)
+        try:
+            r = api.get(f'{APIURL}/login')
+            r.raise_for_status()
+        except Exception as e:
+            print('Connecting to REST backend failed:', str(e))
+            return
+
+        # get local records
         cols = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
         records = c.execute(f'select {",".join(cols)} from files where state = 1 limit 1').fetchall()
 
@@ -212,7 +224,7 @@ def main():
 
             # validate record against database
             try:
-                r = requests.post('http://localhost:8000/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
+                r = api.post(f'{APIURL}/validate/image', json={ k: d[k] for k in ('sha256', 'node_label', 'timestamp')})
                 validation = r.json()
 
                 if r.status_code != 200:
@@ -255,7 +267,7 @@ def main():
 
                 # store metadata in postgres
                 d['resolution'] = (d['resolution_x'], d['resolution_y'])
-                r = requests.post('http://localhost:8000/ingest/image', json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id', 'location_id', 'timestamp', 'file_size', 'resolution')})
+                r = api.post(f'{APIURL}/ingest/image', json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id', 'location_id', 'timestamp', 'file_size', 'resolution')})
 
                 if r.status_code != 200:
                     raise MetadataInsertException(f"failed to insert metadata for {d['path']}: {r.json()['detail']}")
