@@ -361,12 +361,10 @@ def main():
 
     if args.upload:
 
-        # make a queue that yields records marked as 'in progress' (status = 3?)
-        ncpus = os.cpu_count()
-        queue = Queue(maxsize=ncpus)
+        queue = Queue(maxsize=NTHREADS)
 
         try:
-            pool = ThreadPool(ncpus, initializer=worker, initargs=(queue,))
+            pool = ThreadPool(NTHREADS, initializer=worker, initargs=(queue,))
 
             for task in get_tasks(database):
                 queue.put(task)
