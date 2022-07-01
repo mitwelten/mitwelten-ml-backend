@@ -65,6 +65,7 @@ class MetaDataReader(QThread):
         db = self.dbConnectionPool.getconn()
         cursor = db.cursor()
         for i in range(len(audiofiles)):
+            # TODO: make this multithreaded
             audiofiles[i] = self.extract_meta(audiofiles[i])
             audiofiles[i]['row_id'] = i
             audiofiles[i]['row_state'] = -1 # -1:no state, 0:OK, 1:error

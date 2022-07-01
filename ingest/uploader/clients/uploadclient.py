@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
+import os
 
 import psycopg2 as pg
 from psycopg2 import pool
@@ -22,7 +23,7 @@ class UploadClient(QThread):
 
     def run(self):
         count = 0
-        CPU_THREADS = 4
+        CPU_THREADS = os.cpu_count
         storage = Minio(
             crd.minio.host,
             access_key=crd.minio.access_key,
