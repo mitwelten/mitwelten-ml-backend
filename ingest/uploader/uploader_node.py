@@ -47,7 +47,7 @@ def chunks(lst, n):
 
 def build_file_lists(basepath):
     imagefiles = []
-    print('building file tree...')
+    if VERBOSE: print('building file tree...')
     for root, dirs, files in os.walk(os.fspath(basepath)):
         for file in files:
             filepath = os.path.abspath(os.path.join(root, file))
@@ -60,7 +60,7 @@ def build_file_lists(basepath):
                     raise Exception('File is hidden', file, 'hidden')
                 elif file_type[0] == 'image/jpeg': # do we need other types to match?
                     imagefiles.append(filepath)
-                    print(f'{len(imagefiles)}        ', end='\r')
+                    if VERBOSE: print(f'{len(imagefiles)}        ', end='\r')
                 # else:
                 #     raise Exception('File format not compatible', file, file_type[0])
             except Exception as e:
@@ -69,7 +69,7 @@ def build_file_lists(basepath):
                 else:
                     print(e)
 
-    print(f'found {len(imagefiles)} image files')
+    if VERBOSE: print(f'found {len(imagefiles)} image files')
     return (imagefiles)
 
 def image_meta_worker(row):
@@ -185,7 +185,7 @@ def worker(queue: Queue):
                 conn.commit()
                 raise Exception('node is not deployed requested time:', d['node_label'], d['timestamp'].isoformat())
             else:
-                print('new file:', validation['object_name'])
+                if VERBOSE: print('new file:', validation['object_name'])
                 d['object_name'] = validation['object_name']
                 d['node_id']     = validation['node_id']
                 d['location_id'] = validation['location_id']
@@ -211,7 +211,7 @@ def worker(queue: Queue):
             where file_id = ?
             ''', [d['file_id']])
             conn.commit()
-            print(f'created {upload.object_name}; etag: {upload.etag}')
+            if VERBOSE: print(f'created {upload.object_name}; etag: {upload.etag}')
 
             # store metadata in postgres
             d['resolution'] = (d['resolution_x'], d['resolution_y'])
@@ -228,7 +228,7 @@ def worker(queue: Queue):
             where file_id = ?
             ''', [d['file_id']])
             conn.commit()
-            print('inserted metadata into database. done.')
+            if VERBOSE: print('inserted metadata into database. done.')
 
         except MetadataInsertException as e:
             # -5: meta insert error
@@ -287,6 +287,7 @@ def get_tasks(conn: sqlite3.Connection):
 
 def main():
     parser = argparse.ArgumentParser(description='Build file index')
+    parser.add_argument('-v', action='store_true', help='print info to stdout')
 
     parser.add_argument('--index', type=lambda x: is_readable_dir(x), help='index files in path INDEX')
     parser.add_argument('--meta', action='store_true', help='check files and extract and metadata')
@@ -298,6 +299,8 @@ def main():
 
     args = parser.parse_args()
 
+    global VERBOSE
+    VERBOSE = args.v
     NTHREADS = max(1, min(os.cpu_count(), int(args.threads)))
     BATCHSIZE = max(1, min(16384, int(args.batchsize)))
 
@@ -328,7 +331,7 @@ def main():
     if args.index:
         imagefiles = build_file_lists(args.index)
         for batch, i in chunks(imagefiles, BATCHSIZE):
-            print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
+            if VERBOSE: print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
             c.executemany('''
             insert or ignore into files(path, state, indexed_at)
             values (?, 0, strftime('%s'))
@@ -339,9 +342,9 @@ def main():
         records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
         for batch, i in chunks(records, BATCHSIZE):
-            print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
+            if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
             metalist = thread_map(image_meta_worker, batch, max_workers=NTHREADS)
-            print('\n== writing batch to database...')
+            if VERBOSE: print('\n== writing batch to database...')
             for meta in metalist:
                 try:
                     if len(meta) == 2:
