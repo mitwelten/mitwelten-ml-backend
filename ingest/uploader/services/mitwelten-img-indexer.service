@@ -2,7 +2,7 @@
 After=network.target
 
 [Service]
-Type=simple
+Type=idle
 Restart=on-failure
 RestartSec=15
 WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
@@ -10,4 +10,4 @@ ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uplo
 TimeoutSec=10
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
