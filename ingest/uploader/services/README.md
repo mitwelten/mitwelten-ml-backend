@@ -11,6 +11,7 @@ UPLOADERDIR="$HOME/mitwelten-ml-backend/ingest/uploader"
 cd $UPLOADERDIR
 python3 -m venv .venv
 source .venv/bin/activate
+pip install -U pip
 pip install -r requirements-uploader-node.txt
 
 # enable lingering (start user units w/o login)

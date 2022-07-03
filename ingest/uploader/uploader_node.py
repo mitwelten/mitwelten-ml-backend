@@ -348,6 +348,7 @@ def main():
                 print('indexing')
                 checkpoint = c.execute('select indexed_at from files order by indexed_at desc limit 1').fetchone()
                 imagefiles = build_file_lists(args.index, 0 if checkpoint == None else checkpoint[0])
+                print(f'adding {len(imagefiles)} image files to index')
                 for batch, i in chunks(imagefiles, BATCHSIZE):
                     if VERBOSE: print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
                     c.executemany('''
