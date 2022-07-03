@@ -5,8 +5,8 @@ After=network.target
 Type=simple
 Restart=on-failure
 RestartSec=15
-WorkingDirectory=/home/pi/upload
-ExecStart=/home/pi/upload/.venv/bin/python -u /home/pi/upload/uploader.py --index /mnt/elements
+WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node.py --index /mnt/elements
 TimeoutSec=10
 
 [Install]
