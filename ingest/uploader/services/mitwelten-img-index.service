@@ -1,0 +1,13 @@
+[Unit]
+After=network.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=15
+WorkingDirectory=/home/pi/upload
+ExecStart=/home/pi/upload/.venv/bin/python -u /home/pi/upload/uploader.py --index /mnt/elements
+TimeoutSec=10
+
+[Install]
+WantedBy=multi-user.target
