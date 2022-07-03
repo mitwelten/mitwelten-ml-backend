@@ -1,5 +1,6 @@
 import hashlib
-import logging
+import signal
+import sys
 import time
 import traceback
 import argparse
@@ -29,6 +30,12 @@ COLS = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timest
 class MetadataInsertException(BaseException):
     ...
 
+class ShutdownRequestException(BaseException):
+    ...
+
+def sigterm_handler(signo, stack_frame):
+    raise ShutdownRequestException
+
 def is_readable_dir(arg):
     try:
         if os.path.isfile(arg):
@@ -45,31 +52,37 @@ def chunks(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n], i
 
-def build_file_lists(basepath):
+def build_file_lists(basepath, checkpoint: float = 0):
+
     imagefiles = []
-    if VERBOSE: print('building file tree...')
+
     for root, dirs, files in os.walk(os.fspath(basepath)):
+
+        # match root to node_id/date/hour
+        # skip directories older than checkpoint - 1h
+        m = re.match(r'.*/\d{4}-\d{4}/(\d{4}-\d\d-\d\d)/(\d\d)(?:/?|.+)', root)
+        if m == None:
+            continue
+        ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
+        if ts < (checkpoint - 3600): # last hour
+            continue
+
+        # index files
         for file in files:
             filepath = os.path.abspath(os.path.join(root, file))
+            if os.stat(os.path.dirname(filepath)).st_mtime < (checkpoint - 300):
+                break # skip directory if not modified within checkpoint - 3min
             try:
-                # file_size = os.path.getsize(filepath) # this might be redundant, does mimetypes depend on it?
-                file_type = mimetypes.guess_type(filepath)
-                # if file_size == 0:
-                #     raise Exception('File is empty', file, 'empty')
-                if os.path.basename(filepath).startswith('.'):
-                    raise Exception('File is hidden', file, 'hidden')
-                elif file_type[0] == 'image/jpeg': # do we need other types to match?
-                    imagefiles.append(filepath)
-                    if VERBOSE: print(f'{len(imagefiles)}        ', end='\r')
-                # else:
-                #     raise Exception('File format not compatible', file, file_type[0])
-            except Exception as e:
-                if(len(e.args)) == 3:
-                    print(f'skipping {e.args[1]}: {e.args[0]} ({e.args[2]})')
-                else:
-                    print(e)
+                if os.stat(filepath).st_mtime >= checkpoint:
+                    file_type = mimetypes.guess_type(filepath)
+                    if os.path.basename(filepath).startswith('.'):
+                        continue
+                    elif file_type[0] == 'image/jpeg': # do we need other types to match?
+                        imagefiles.append(filepath)
+                        if VERBOSE: print(f'{len(imagefiles)}        ', end='\r')
+            except:
+                print(traceback.format_exc())
 
-    if VERBOSE: print(f'found {len(imagefiles)} image files')
     return (imagefiles)
 
 def image_meta_worker(row):
@@ -329,14 +342,29 @@ def main():
         return
 
     if args.index:
-        imagefiles = build_file_lists(args.index)
-        for batch, i in chunks(imagefiles, BATCHSIZE):
-            if VERBOSE: print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
-            c.executemany('''
-            insert or ignore into files(path, state, indexed_at)
-            values (?, 0, strftime('%s'))
-            ''',[(path,) for path in batch])
-            database.commit()
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        while True:
+            try:
+                print('indexing')
+                checkpoint = c.execute('select indexed_at from files order by indexed_at desc limit 1').fetchone()
+                imagefiles = build_file_lists(args.index, 0 if checkpoint == None else checkpoint[0])
+                for batch, i in chunks(imagefiles, BATCHSIZE):
+                    if VERBOSE: print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
+                    c.executemany('''
+                    insert or ignore into files(path, state, indexed_at)
+                    values (?, 0, strftime('%s'))
+                    ''',[(path,) for path in batch])
+                    database.commit()
+                time.sleep(900)
+            except KeyboardInterrupt:
+                break
+            except ShutdownRequestException:
+                break
+            except Exception as e:
+                # print error but continue
+                print(traceback.format_exc())
+                time.sleep(900)
+        sys.exit(0)
 
     if args.meta:
         records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
