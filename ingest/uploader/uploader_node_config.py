@@ -1,16 +1,16 @@
 class NodeUploaderConfig(object):
     'Mitwelten image-uploader service configuration'
 
-    period_start = '20:00'
+    period_start = '18:00'
     '''
     If running with --timed flag:
-    Start of time period, format '%H:%M'
+    Start of time period, format '%H:%M' UTC
     '''
 
-    period_end = '08:00'
+    period_end = '06:00'
     '''
     If running with --timed flag:
-    End of time period, format '%H:%M'
+    End of time period, format '%H:%M' UTC
     '''
 
 
