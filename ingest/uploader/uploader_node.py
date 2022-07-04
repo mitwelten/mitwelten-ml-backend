@@ -458,42 +458,57 @@ def main():
 
     if args.upload:
 
+        signal.signal(signal.SIGTERM, sigterm_handler)
         nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
-        queue = Queue(maxsize=nthreads_upload)
 
-        try:
-            pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
-
-            for task in get_tasks(database):
-                queue.put(task)
-        except Exception as e:
-            print('Exiting queue:', e)
-
+        while True:
             try:
-                while True:
-                    task = queue.get(True, 2)
-                    print('task from q', task)
-                    c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
-            except QueueEmpty:
-                database.commit()
-            except:
-                print(traceback.format_exc(), flush=True)
 
-        finally:
-            print('signaling threads to stop...')
-            for n in range(nthreads_upload):
-                queue.put(None)
+                if not check_ontime(cfg.upload, args.timed):
+                    continue
 
-            print('closing queue...')
-            queue.join()
+                queue = Queue(maxsize=nthreads_upload)
+                pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
+                for task in get_tasks(database):
+                    queue.put(task)
 
-            print('waiting for tasks to end...')
-            pool.close()
-            pool.join()
+            except ShutdownRequestException or KeyboardInterrupt:
+                # drain the queue and reset drained tasks
+                try:
+                    while True:
+                        task = queue.get(True, 2)
+                        print('task from q', task)
+                        c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
+                except QueueEmpty:
+                    database.commit()
+                except:
+                    print(traceback.format_exc(), flush=True)
 
-            print('done.')
+                # close queue and stop worker threads
+                print('signaling threads to stop...')
+                for n in range(nthreads_upload):
+                    queue.put(None)
 
-    database.close()
+                print('closing queue...')
+                queue.join()
+
+                print('waiting for tasks to end...')
+                pool.close()
+                pool.join()
+
+                print('done.')
+                break
+
+            except Exception as e:
+                # print error but continue
+                print(traceback.format_exc())
+                time.sleep(300)
+
+            else:
+                time.sleep(300)
+
+        database.close()
+        sys.exit(0)
 
 if __name__ == '__main__':
     main()

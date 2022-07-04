@@ -1,0 +1,14 @@
+[Unit]
+Description=Mitwelten Image Uploader: Uploader Worker Process
+After=network.target
+
+[Service]
+Type=idle
+Restart=on-failure
+RestartSec=15
+WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node.py --upload
+TimeoutSec=30
+
+[Install]
+WantedBy=default.target
