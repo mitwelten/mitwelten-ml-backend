@@ -20,6 +20,7 @@ from minio.commonconfig import Tags
 from PIL import Image
 
 import credentials as crd
+import uploader_node_config as cfg
 
 BS = 65536
 APIURL = crd.api.url
@@ -304,6 +305,15 @@ def get_tasks(conn: sqlite3.Connection):
             print(traceback.format_exc(), flush=True)
             raise
 
+def check_ontime(cfg: cfg.NodeUploaderConfig, timed: bool) -> bool:
+    'If current time is in period or no timing is specified run'
+    if timed:
+        start = datetime.strptime(cfg.period_start, '%H:%M')
+        end   = datetime.strptime(cfg.period_end,   '%H:%M')
+        return datetime.now() > start and datetime.now() < end
+    else:
+        return True
+
 def main():
     parser = argparse.ArgumentParser(description='Build file index')
     parser.add_argument('-v', action='store_true', help='print info to stdout')
@@ -313,7 +323,8 @@ def main():
     parser.add_argument('--upload', action='store_true', help='upload checked files')
     parser.add_argument('--test', action='store_true', help='select some records')
 
-    parser.add_argument('--threads',  metavar='NTHREADS', help='number of threads to spawn', default=4)
+    parser.add_argument('--timed', action='store_true', help='only run in configured time period')
+    parser.add_argument('--threads', metavar='NTHREADS', help='number of threads to spawn', default=4)
     parser.add_argument('--batchsize', help='number of files to process as batch', default=1024)
 
     args = parser.parse_args()
@@ -391,6 +402,8 @@ def main():
         records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
         for batch, i in chunks(records, BATCHSIZE):
+            if not check_ontime(cfg.meta, args.timed):
+                break
             if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
             metalist = thread_map(image_meta_worker, batch, max_workers=NTHREADS)
             if VERBOSE: print('\n== writing batch to database...')
@@ -416,6 +429,8 @@ def main():
                     where file_id = ?
                     ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
             database.commit()
+
+        sys.exit(0)
 
     if args.upload:
 
