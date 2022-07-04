@@ -1,0 +1,13 @@
+[Unit]
+After=network.target
+
+[Service]
+Type=idle
+Restart=on-failure
+RestartSec=15
+WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node.py --meta --timed --batchsize 100
+TimeoutSec=60
+
+[Install]
+WantedBy=default.target
