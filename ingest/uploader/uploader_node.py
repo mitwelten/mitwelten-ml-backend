@@ -410,7 +410,7 @@ def main():
         while True:
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
-                time.sleep(900)
+                time.sleep(600)
                 if not check_ontime(cfg.meta, args.timed):
                     continue
 
