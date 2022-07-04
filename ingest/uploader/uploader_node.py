@@ -311,7 +311,10 @@ def check_ontime(cfg: cfg.NodeUploaderConfig, timed: bool) -> bool:
         start = datetime.time(datetime.strptime(cfg.period_start, '%H:%M'))
         end   = datetime.time(datetime.strptime(cfg.period_end,   '%H:%M'))
         now   = datetime.time(datetime.now())
-        return now > start and now < end
+        if start > end:
+            return now > start or now < end
+        else:
+            return now > start and now < end
     else:
         return True
 
