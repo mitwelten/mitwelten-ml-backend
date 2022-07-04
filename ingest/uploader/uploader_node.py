@@ -27,6 +27,9 @@ APIURL = crd.api.url
 COLS = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
 
 
+class IndexingException(BaseException):
+    ...
+
 class MetadataInsertException(BaseException):
     ...
 
@@ -58,20 +61,16 @@ def build_file_lists(basepath, checkpoint: float = 0):
 
     for root, dirs, files in os.walk(os.fspath(basepath)):
 
-        # race condition:
-        # files added during indexing are skipped next time, because the checkpoint
-        # is the time of insertion
-        # - take start timestamp as indexed timestamp -> checkpoint?
-
-        # if file is unreadable, exit indexing!!! otherwhise the checkpoint gets moved forward.
-
         # match root to node_id/date/hour
         # skip directories older than checkpoint - 1h
         m = re.match(r'.*/\d{4}-\d{4}/(\d{4}-\d\d-\d\d)/(\d\d)(?:/?|.+)', root)
         if m == None:
+            print('DEBUG:\tskipping root:', root)
             continue
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
+        print('DEBUG:\tts', datetime.fromtimestamp(ts).isoformat(), '\tcheckpoint', datetime.fromtimestamp(ts).isoformat(checkpoint))
         if ts < (checkpoint - 7200): # last hour + max rounding error of date format
+            print('DEBUG:\tskipping, ts below checkpoint - 2h:', root)
             continue
 
         # index files
@@ -89,8 +88,11 @@ def build_file_lists(basepath, checkpoint: float = 0):
                         if VERBOSE: print(f'{len(imagefiles)}        ', end='\r')
             except:
                 print(traceback.format_exc())
+                # if file is unreadable, exit indexing,
+                # avoid updating the checkpoint.
+                raise IndexingException
 
-    return (imagefiles)
+    return imagefiles
 
 def image_meta_worker(row):
 
@@ -342,6 +344,11 @@ def main():
         file_uploaded_at ingeger
     )''')
     c.execute('create index if not exists files_state_idx on files (state)')
+    c.execute('''create table if not exists checkpoints (
+        type text unique,
+        time_in integer,
+        time_out integer
+    )''')
     database.commit()
 
     if args.test:
@@ -355,8 +362,12 @@ def main():
         while True:
             try:
                 print('indexing')
-                checkpoint = c.execute('select indexed_at from files order by indexed_at desc limit 1').fetchone()
-                imagefiles = build_file_lists(args.index, 0 if checkpoint == None else checkpoint[0])
+                checkpoint = c.execute('''select time_out from checkpoints where type = 'index' ''').fetchone()
+                checkpoint = 0 if checkpoint == None else checkpoint[0]
+                c.execute('''insert into checkpoints(type, time_in) values ('index', strftime('%s'))
+                    on conflict(type) do update set time_in = strftime('%s')''')
+                database.commit()
+                imagefiles = build_file_lists(args.index, checkpoint)
                 print(f'adding {len(imagefiles)} image files to index')
                 for batch, i in chunks(imagefiles, BATCHSIZE):
                     if VERBOSE: print('\n== processing batch (index)', 1 + (i // BATCHSIZE), 'of', 1 + (len(imagefiles) // BATCHSIZE), ' ==\n')
@@ -374,6 +385,9 @@ def main():
                 # print error but continue
                 print(traceback.format_exc())
                 time.sleep(900)
+            else:
+                c.execute('''update checkpoints set time_out = time_in where type = 'index' ''')
+                database.commit()
         sys.exit(0)
 
     if args.meta:
