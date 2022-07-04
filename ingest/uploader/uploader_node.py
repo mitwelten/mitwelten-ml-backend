@@ -480,7 +480,6 @@ def main():
                 try:
                     while True:
                         task = queue.get(True, 2)
-                        print('task from q', task)
                         c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
                 except QueueEmpty:
                     database.commit()
