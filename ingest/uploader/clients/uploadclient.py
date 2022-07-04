@@ -23,7 +23,7 @@ class UploadClient(QThread):
 
     def run(self):
         count = 0
-        CPU_THREADS = os.cpu_count
+        CPU_THREADS = os.cpu_count()
         storage = Minio(
             crd.minio.host,
             access_key=crd.minio.access_key,
