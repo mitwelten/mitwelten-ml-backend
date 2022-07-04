@@ -399,13 +399,14 @@ def main():
         sys.exit(0)
 
     if args.meta:
+        nthreads_meta = cfg.meta.threads if cfg.meta.threads else NTHREADS
         records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
         for batch, i in chunks(records, BATCHSIZE):
             if not check_ontime(cfg.meta, args.timed):
                 break
             if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
-            metalist = thread_map(image_meta_worker, batch, max_workers=NTHREADS)
+            metalist = thread_map(image_meta_worker, batch, max_workers=nthreads_meta)
             if VERBOSE: print('\n== writing batch to database...')
             for meta in metalist:
                 try:
@@ -434,10 +435,11 @@ def main():
 
     if args.upload:
 
-        queue = Queue(maxsize=NTHREADS)
+        nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
+        queue = Queue(maxsize=nthreads_upload)
 
         try:
-            pool = ThreadPool(NTHREADS, initializer=worker, initargs=(queue,))
+            pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
 
             for task in get_tasks(database):
                 queue.put(task)
@@ -456,7 +458,7 @@ def main():
 
         finally:
             print('signaling threads to stop...')
-            for n in range(NTHREADS):
+            for n in range(nthreads_upload):
                 queue.put(None)
 
             print('closing queue...')
