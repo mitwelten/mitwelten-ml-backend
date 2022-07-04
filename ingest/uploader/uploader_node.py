@@ -68,7 +68,7 @@ def build_file_lists(basepath, checkpoint: float = 0):
             print('DEBUG:\tskipping root:', root)
             continue
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
-        print('DEBUG:\tts', datetime.fromtimestamp(ts).isoformat(), '\tcheckpoint', datetime.fromtimestamp(ts).isoformat(checkpoint))
+        print('DEBUG:\tts', datetime.fromtimestamp(ts).isoformat(), '\tcheckpoint', datetime.fromtimestamp(checkpoint).isoformat())
         if ts < (checkpoint - 7200): # last hour + max rounding error of date format
             print('DEBUG:\tskipping, ts below checkpoint - 2h:', root)
             continue
