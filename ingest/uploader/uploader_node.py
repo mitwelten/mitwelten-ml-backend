@@ -404,36 +404,51 @@ def main():
 
     if args.meta:
         nthreads_meta = cfg.meta.threads if cfg.meta.threads else NTHREADS
-        records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        while True:
+            try:
+                # waiting in the beginning gives other jobs time to finish before this one
+                time.sleep(900)
+                if not check_ontime(cfg.meta, args.timed):
+                    continue
+                records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
-        for batch, i in chunks(records, BATCHSIZE):
-            if not check_ontime(cfg.meta, args.timed):
+                for batch, i in chunks(records, BATCHSIZE):
+                    if not check_ontime(cfg.meta, args.timed):
+                        break
+                    if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
+                    metalist = thread_map(image_meta_worker, batch, max_workers=nthreads_meta)
+                    if VERBOSE: print('\n== writing batch to database...')
+                    for meta in metalist:
+                        try:
+                            if len(meta) == 2:
+                                raise ValueError
+                            c.execute('''
+                            update files set (sha256, state, file_size, node_label, timestamp, resolution_x, resolution_y, checked_at)
+                            = (?, 1, ?, ?, ?, ?, ?, strftime('%s'))
+                            where file_id = ?
+                            ''', [meta['sha256'], meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
+                        except ValueError as e:
+                            c.execute('''
+                            update files set (state, checked_at) = (-1, strftime('%s'))
+                            where file_id = ?
+                            ''', [meta['file_id']])
+                        except sqlite3.IntegrityError as e:
+                            print(meta['path'], e)
+                            c.execute('''
+                            update files set (state, file_size, node_label, timestamp, resolution_x, resolution_y, checked_at)
+                            = (-2, ?, ?, ?, ?, ?, strftime('%s'))
+                            where file_id = ?
+                            ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
+                    database.commit()
+
+            except ShutdownRequestException:
                 break
-            if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
-            metalist = thread_map(image_meta_worker, batch, max_workers=nthreads_meta)
-            if VERBOSE: print('\n== writing batch to database...')
-            for meta in metalist:
-                try:
-                    if len(meta) == 2:
-                        raise ValueError
-                    c.execute('''
-                    update files set (sha256, state, file_size, node_label, timestamp, resolution_x, resolution_y, checked_at)
-                    = (?, 1, ?, ?, ?, ?, ?, strftime('%s'))
-                    where file_id = ?
-                    ''', [meta['sha256'], meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
-                except ValueError as e:
-                    c.execute('''
-                    update files set (state, checked_at) = (-1, strftime('%s'))
-                    where file_id = ?
-                    ''', [meta['file_id']])
-                except sqlite3.IntegrityError as e:
-                    print(meta['path'], e)
-                    c.execute('''
-                    update files set (state, file_size, node_label, timestamp, resolution_x, resolution_y, checked_at)
-                    = (-2, ?, ?, ?, ?, ?, strftime('%s'))
-                    where file_id = ?
-                    ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
-            database.commit()
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                # print error but continue
+                print(traceback.format_exc())
 
         sys.exit(0)
 
