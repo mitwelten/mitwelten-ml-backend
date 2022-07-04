@@ -411,12 +411,14 @@ def main():
                 time.sleep(900)
                 if not check_ontime(cfg.meta, args.timed):
                     continue
+
+                print('extracting metadata, checking for file corruption')
                 records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
                 for batch, i in chunks(records, BATCHSIZE):
                     if not check_ontime(cfg.meta, args.timed):
                         break
-                    if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
+                    print(f'processing batch {1 + (i // BATCHSIZE)} of {1 + (len(records) // BATCHSIZE)} ({BATCHSIZE} items)')
                     metalist = []
                     with ThreadPoolExecutor(nthreads_meta) as executor:
                         metalist = executor.map(image_meta_worker, batch)
