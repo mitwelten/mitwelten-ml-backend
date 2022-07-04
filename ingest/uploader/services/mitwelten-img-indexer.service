@@ -1,4 +1,5 @@
 [Unit]
+Description=Mitwelten Image Uploader: Indexing Worker Process
 After=network.target
 
 [Service]
