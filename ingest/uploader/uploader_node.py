@@ -65,21 +65,18 @@ def build_file_lists(basepath, checkpoint: float = 0):
         # skip directories older than checkpoint - 1h
         m = re.match(r'.*/\d{4}-\d{4}/(\d{4}-\d\d-\d\d)/(\d\d)(?:/?|.+)', root)
         if m == None:
-            print('DEBUG:\tskipping root:', root)
             continue
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
-        print('DEBUG:\tts', datetime.fromtimestamp(ts).isoformat(), '\tcheckpoint', datetime.fromtimestamp(checkpoint).isoformat())
-        if ts < (checkpoint - 7200): # last hour + max rounding error of date format
-            print('DEBUG:\tskipping, ts below checkpoint - 2h:', root)
+        if ts < ((checkpoint // 3600) * 3600): # round checkpoint to hour of ts
             continue
 
         # index files
         for file in files:
             filepath = os.path.abspath(os.path.join(root, file))
-            if os.stat(os.path.dirname(filepath)).st_mtime < (checkpoint - 300):
-                break # skip directory if not modified within checkpoint - 3min
+            if os.stat(os.path.dirname(filepath)).st_mtime < checkpoint:
+                break # skip directory if not modified since last checkpoint
             try:
-                if os.stat(filepath).st_mtime >= (checkpoint - 3600):
+                if os.stat(filepath).st_mtime >= checkpoint:
                     file_type = mimetypes.guess_type(filepath)
                     if os.path.basename(filepath).startswith('.'):
                         continue
