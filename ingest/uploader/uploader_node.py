@@ -407,7 +407,7 @@ def main():
     if args.meta:
         nthreads_meta = cfg.meta.threads if cfg.meta.threads else NTHREADS
         signal.signal(signal.SIGTERM, sigterm_handler)
-        while True:
+        while True: # This could be handled in the system unit, restart after exit, with delay
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
                 time.sleep(600)
@@ -464,9 +464,10 @@ def main():
         signal.signal(signal.SIGTERM, sigterm_handler)
         nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
 
-        while True:
+        while True: # This could be handled in the system unit, restart after exit, with delay
             try:
 
+                # TODO: move to worker. like this it doesn't stop the worker from running
                 if not check_ontime(cfg.upload, args.timed):
                     continue
 
