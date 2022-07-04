@@ -14,7 +14,7 @@ import requests
 from multiprocessing.pool import ThreadPool
 from queue import Queue, Empty as QueueEmpty
 
-from tqdm.contrib.concurrent import thread_map
+from concurrent.futures import ThreadPoolExecutor
 from minio import Minio
 from minio.commonconfig import Tags
 from PIL import Image
@@ -417,7 +417,9 @@ def main():
                     if not check_ontime(cfg.meta, args.timed):
                         break
                     if VERBOSE: print('\n== processing batch (meta)', 1 + (i // BATCHSIZE), 'of', 1 + (len(records) // BATCHSIZE), ' ==\n')
-                    metalist = thread_map(image_meta_worker, batch, max_workers=nthreads_meta)
+                    metalist = []
+                    with ThreadPoolExecutor(nthreads_meta) as executor:
+                        metalist = executor.map(image_meta_worker, batch)
                     if VERBOSE: print('\n== writing batch to database...')
                     for meta in metalist:
                         try:
