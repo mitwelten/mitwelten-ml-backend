@@ -308,9 +308,10 @@ def get_tasks(conn: sqlite3.Connection):
 def check_ontime(cfg: cfg.NodeUploaderConfig, timed: bool) -> bool:
     'If current time is in period or no timing is specified run'
     if timed:
-        start = datetime.strptime(cfg.period_start, '%H:%M')
-        end   = datetime.strptime(cfg.period_end,   '%H:%M')
-        return datetime.now() > start and datetime.now() < end
+        start = datetime.time(datetime.strptime(cfg.period_start, '%H:%M'))
+        end   = datetime.time(datetime.strptime(cfg.period_end,   '%H:%M'))
+        now   = datetime.time(datetime.now())
+        return now > start and now < end
     else:
         return True
 
