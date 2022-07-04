@@ -400,6 +400,8 @@ def main():
                 c.execute('''update checkpoints set time_out = time_in where type = 'index' ''')
                 database.commit()
                 time.sleep(900)
+
+        database.close()
         sys.exit(0)
 
     if args.meta:
@@ -454,6 +456,7 @@ def main():
                 # print error but continue
                 print(traceback.format_exc())
 
+        database.close()
         sys.exit(0)
 
     if args.upload:
@@ -509,6 +512,8 @@ def main():
 
         database.close()
         sys.exit(0)
+
+    database.close()
 
 if __name__ == '__main__':
     main()
