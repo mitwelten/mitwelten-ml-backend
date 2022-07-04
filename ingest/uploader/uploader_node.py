@@ -58,13 +58,20 @@ def build_file_lists(basepath, checkpoint: float = 0):
 
     for root, dirs, files in os.walk(os.fspath(basepath)):
 
+        # race condition:
+        # files added during indexing are skipped next time, because the checkpoint
+        # is the time of insertion
+        # - take start timestamp as indexed timestamp -> checkpoint?
+
+        # if file is unreadable, exit indexing!!! otherwhise the checkpoint gets moved forward.
+
         # match root to node_id/date/hour
         # skip directories older than checkpoint - 1h
         m = re.match(r'.*/\d{4}-\d{4}/(\d{4}-\d\d-\d\d)/(\d\d)(?:/?|.+)', root)
         if m == None:
             continue
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
-        if ts < (checkpoint - 3600): # last hour
+        if ts < (checkpoint - 7200): # last hour + max rounding error of date format
             continue
 
         # index files
@@ -73,7 +80,7 @@ def build_file_lists(basepath, checkpoint: float = 0):
             if os.stat(os.path.dirname(filepath)).st_mtime < (checkpoint - 300):
                 break # skip directory if not modified within checkpoint - 3min
             try:
-                if os.stat(filepath).st_mtime >= checkpoint:
+                if os.stat(filepath).st_mtime >= (checkpoint - 3600):
                     file_type = mimetypes.guess_type(filepath)
                     if os.path.basename(filepath).startswith('.'):
                         continue
