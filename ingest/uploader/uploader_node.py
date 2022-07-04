@@ -341,6 +341,8 @@ def main():
         meta_uploaded_at integer,
         file_uploaded_at ingeger
     )''')
+    c.execute('create index if not exists files_state_idx on files (state)')
+    database.commit()
 
     if args.test:
         r = c.execute('select * from files limit 20').fetchall()
