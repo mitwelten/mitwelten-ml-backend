@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
     QVBoxLayout, QFileDialog, QVBoxLayout, QLabel, QProgressBar,
     QPushButton, QHeaderView, QSizePolicy, QTableView, QWidget)
 
+import re
 import psycopg2 as pg
 from psycopg2 import pool
 
@@ -64,7 +65,7 @@ class Widget(QWidget):
 
         # select box for node_label
         self.cb = QComboBox()
-        self.cb.addItems(node_labels)
+        self.cb.addItem('0000-0000 (choose node label)')
         self.cb.currentIndexChanged.connect(self.onSelectionChange)
         self.selector_layout.addWidget(QLabel('SD-Card/Node Label:'))
         self.selector_layout.addWidget(self.cb)
@@ -103,8 +104,12 @@ class Widget(QWidget):
         # set the layout
         self.setLayout(self.main_layout)
 
+        # fill node selection options
+        self.cb.addItems(self.fetchDeployments())
+
     def onSelectionChange(self):
-        self.node_label = self.cb.currentText()
+        self.node_label = re.match(r'(\d{4}-\d{4}).*', self.cb.currentText()).groups()[0]
+        print(self.node_label)
         if self.node_label != '0000-0000':
             self.importButton.setEnabled(True)
         else:
@@ -173,6 +178,27 @@ class Widget(QWidget):
         self.uploader.uploadFinished.connect(self.onUploadFinished)
         self.uploader.start()
         self.uploadButton.setEnabled(False)
+
+    def fetchDeployments(self):
+        if not self.connectDb():
+            return
+        db = self.dbPool.getconn()
+        cursor = db.cursor()
+
+        cursor.execute(f'''
+        select period, d.node_id, n.node_label from {crd.db.schema}.deployments d
+        inner join {crd.db.schema}.nodes n on d.node_id = n.node_id
+        where n.platform = 'AudioMoth' order by n.node_label
+        ''')
+        nodes = cursor.fetchall()
+        cursor.close()
+        self.dbPool.putconn(db)
+        node_labels = []
+        for n in nodes:
+            start = '-inf' if n[0].lower == None else n[0].lower.strftime('%Y-%m-%d')
+            end = 'inf' if n[0].upper == None else n[0].upper.strftime('%Y-%m-%d')
+            node_labels.append(f'{n[2]} ({start} - {end})')
+        return node_labels
 
     def connectDb(self):
         if self.dbPool == None:
