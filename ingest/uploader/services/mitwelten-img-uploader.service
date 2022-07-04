@@ -7,7 +7,7 @@ Type=idle
 Restart=on-failure
 RestartSec=15
 WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
-ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node.py --upload
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node.py --upload --timed
 TimeoutSec=30
 
 [Install]

@@ -26,6 +26,8 @@ class MetaConfig(NodeUploaderConfig):
 
 class UploadConfig(NodeUploaderConfig):
 
+    period_start = '15:15'
+    period_end = '08:45'
     threads = 4
     'Number of threads to spawn'
 
