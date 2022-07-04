@@ -373,7 +373,6 @@ def main():
                     values (?, 0, strftime('%s'))
                     ''',[(path,) for path in batch])
                     database.commit()
-                time.sleep(900)
             except KeyboardInterrupt:
                 break
             except ShutdownRequestException:
@@ -385,6 +384,7 @@ def main():
             else:
                 c.execute('''update checkpoints set time_out = time_in where type = 'index' ''')
                 database.commit()
+                time.sleep(900)
         sys.exit(0)
 
     if args.meta:
