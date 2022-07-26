@@ -120,7 +120,7 @@ class Widget(QWidget):
         self.statusLabel.setText(f'Imported metadata: {path}')
 
     def onExtractFinished(self, audiofiles):
-        self.importButton.setEnabled(True)
+        self.importButton.setEnabled(True) # re-enable after extraction finishes
         self.statusLabel.setText(f'Built file list of {len(audiofiles)} audiofiles')
 
         self.model.load_data(audiofiles)
@@ -164,7 +164,7 @@ class Widget(QWidget):
         self.metareader.extractFinished.connect(self.onExtractFinished)
         self.metareader.start()
         self.statusLabel.setText(f'Importing metadata...')
-        self.importButton.setEnabled(False)
+        self.importButton.setEnabled(False) # disable during extraction
 
     def uploadFiles(self):
         if not self.connectDb():
@@ -177,7 +177,7 @@ class Widget(QWidget):
         self.uploader.countChanged.connect(self.onUploadIteration)
         self.uploader.uploadFinished.connect(self.onUploadFinished)
         self.uploader.start()
-        self.uploadButton.setEnabled(False)
+        self.uploadButton.setEnabled(False) # disable during upload
 
     def fetchDeployments(self):
         if not self.connectDb():
