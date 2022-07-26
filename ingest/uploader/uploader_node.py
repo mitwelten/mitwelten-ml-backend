@@ -68,7 +68,7 @@ def build_file_lists(basepath, checkpoint: float = 0):
         if m == None:
             continue
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
-        if ts < ((checkpoint // 3600) * 3600): # round checkpoint to hour of ts
+        if ts < (((checkpoint // 3600) * 3600) - 3600): # round checkpoint to hour of ts
             continue
 
         # index files
