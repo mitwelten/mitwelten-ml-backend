@@ -5,7 +5,7 @@ class CustomTableModel(QAbstractTableModel):
     def __init__(self):
         QAbstractTableModel.__init__(self)
         self.row_count = 0
-        self.column_count = 7
+        self.column_count = 8
         self.files = []
 
     def load_data(self, data):
@@ -17,13 +17,13 @@ class CustomTableModel(QAbstractTableModel):
         return parent.isValid() if 0 else len(self.files)
 
     def columnCount(self, parent):
-        return parent.isValid() if 0 else 7
+        return parent.isValid() if 0 else 8
 
     def headerData(self, section, orientation, role):
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
-            return ('Action', 'Start Date', 'Duration', 'Filesize', 'Samplerate', 'Recording Status', 'Source File Path')[section]
+            return ('Action', 'Start Date', 'Duration', 'Filesize', 'Samplerate', 'Recording Status', 'Comment', 'Source File Path')[section]
         else:
             return f"{section}"
 
@@ -41,7 +41,7 @@ class CustomTableModel(QAbstractTableModel):
         column = index.column()
         row = index.row()
         data = self.files[row]
-        if role == Qt.DisplayRole:
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             if column == 0:
                 if data['duplicate_check'][0] or data['duplicate_check'][1]:
                     state = []
@@ -65,6 +65,8 @@ class CustomTableModel(QAbstractTableModel):
             elif column == 5:
                 return str(data['rec_end_status'])
             elif column == 6:
+                return '' if data['comment'] == None else str(data['comment'])
+            elif column == 7:
                 return str(data['original_file_path'])
         elif role == Qt.BackgroundRole:
             if data['row_state'] == 1:
@@ -74,3 +76,15 @@ class CustomTableModel(QAbstractTableModel):
         # elif role == Qt.TextAlignmentRole:
         #     return Qt.AlignLeft
         return None
+
+    def setData(self, index, value, role):
+        if role == Qt.EditRole:
+            self.files[index.row()]['comment'] = value if value != '' else None
+            return True
+
+    def flags(self, index):
+        column = index.column()
+        if column == 6:
+            return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
+        else:
+            return Qt.ItemIsEnabled | Qt.ItemIsSelectable
