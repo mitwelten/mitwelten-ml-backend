@@ -250,6 +250,15 @@ def worker(queue: Queue):
             conn.commit()
             if VERBOSE: print('inserted metadata into database. done.')
 
+            # delete file from disk, update state
+            # record should be manually deleted from sqlite files table
+            os.remove(d['path'])
+            cur.execute('''
+            update files set state = 4
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+
         except MetadataInsertException as e:
             # -5: meta insert error
             print('MetadataInsertException', str(e))
@@ -259,6 +268,10 @@ def worker(queue: Queue):
             ''', [d['file_id']])
             conn.commit()
             cur.close()
+
+        except FileNotFoundError:
+            # file not found either when uploading or when deleting
+            print('Error during upload, file not found: ', d['path'])
 
         except Exception as e:
             # -4: file upload error
