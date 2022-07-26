@@ -35,7 +35,7 @@ class Widget(QWidget):
         QWidget.__init__(self)
 
         self.dbPool = None
-        self.file = ''
+        self.source = ''
         self.node_label = '0000-0000'
 
         # Getting the Model
@@ -148,17 +148,17 @@ class Widget(QWidget):
         self.statusLabel.setText(f'Upload finished: {count}')
 
     def browseForSource(self):
-        self.file = str(QFileDialog.getExistingDirectory(self, 'Browse for source folder'))
-        self.statusLabel.setText(f'Source folder set to "{self.file}"')
+        self.source = str(QFileDialog.getExistingDirectory(self, 'Browse for source folder'))
+        self.statusLabel.setText(f'Source folder set to "{self.source}"')
 
     def readMeta(self):
         if not self.connectDb():
             return
-        if(len(self.file) == 0):
+        if(len(self.source) == 0):
             self.browseForSource()
 
         self.pbar.setValue(0)
-        self.metareader = MetaDataReader(self.dbPool, self.file, self.node_label)
+        self.metareader = MetaDataReader(self.dbPool, self.source, self.node_label)
         self.metareader.totalChanged.connect(lambda total: self.pbar.setMaximum(total))
         self.metareader.countChanged.connect(self.onExtractIteration)
         self.metareader.extractFinished.connect(self.onExtractFinished)
