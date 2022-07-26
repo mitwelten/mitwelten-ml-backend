@@ -121,6 +121,7 @@ class Widget(QWidget):
 
     def onExtractFinished(self, audiofiles):
         self.importButton.setEnabled(True) # re-enable after extraction finishes
+        self.source = '' # clear the selected source
         self.statusLabel.setText(f'Built file list of {len(audiofiles)} audiofiles')
 
         self.model.load_data(audiofiles)
