@@ -109,7 +109,6 @@ class Widget(QWidget):
 
     def onSelectionChange(self):
         self.node_label = re.match(r'(\d{4}-\d{4}).*', self.cb.currentText()).groups()[0]
-        print(self.node_label)
         if self.node_label != '0000-0000':
             self.importButton.setEnabled(True)
         else:
