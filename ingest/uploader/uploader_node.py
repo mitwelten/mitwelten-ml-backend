@@ -251,7 +251,7 @@ def worker(queue: Queue):
             if VERBOSE: print('inserted metadata into database. done.')
 
             # delete file from disk, update state
-            # record should be manually deleted from sqlite files table
+            # record should not be deleted as the hash is used to check for duplicates
             os.remove(d['path'])
             cur.execute('''
             update files set state = 4
