@@ -270,8 +270,15 @@ def worker(queue: Queue):
             cur.close()
 
         except FileNotFoundError:
+            # -6: file not found error
             # file not found either when uploading or when deleting
             print('Error during upload, file not found: ', d['path'])
+            cur.execute('''
+            update files set (state, file_uploaded_at) = (-6, strftime('%s'))
+            where file_id = ?
+            ''', [d['file_id']])
+            conn.commit()
+            cur.close()
 
         except Exception as e:
             # -4: file upload error
