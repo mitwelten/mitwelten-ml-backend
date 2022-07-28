@@ -218,15 +218,30 @@ def worker(queue, localcfg):
         finally:
             connection.commit()
 
+def is_readable_dir(arg):
+    try:
+        if os.path.isfile(arg):
+            arg = os.path.dirname(arg)
+        if os.path.isdir(arg) and os.access(arg, os.R_OK):
+            return arg
+        else:
+            raise f'{arg}: Directory not accessible'
+    except Exception as e:
+        raise ValueError(f'Can\'t read directory/file {arg}')
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run and manage BirdNET inferrence queue')
-    parser.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
-    parser.add_argument('--reset-failed', action='store_true', default=False, help='Reset failed tasks to pending, clearing results')
-    parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
-    parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
 
-    parser.add_argument('--tf-gpu', action='store_true', default=False, help='Run on GPU, using protobuf model')
+    p_manage = parser.add_argument_group('Manage Task Queue')
+    p_manage.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
+    p_manage.add_argument('--reset-failed', action='store_true', default=False, help='Reset failed tasks to pending, clearing results')
+    p_manage.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
+
+    p_run = parser.add_argument_group('Run Pipeline')
+    p_run.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
+    p_run.add_argument('--tf-gpu', action='store_true', default=False, help='Run on GPU, using protobuf model')
+    p_run.add_argument('--source', metavar='PATH', type=lambda x: is_readable_dir(x), help='Read input from disk at PATH instead of S3')
 
     args = parser.parse_args()
 
@@ -246,7 +261,9 @@ if __name__ == '__main__':
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         ncpus = os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
-        localcfg = { 'TF_GPU': args.tf_gpu }
+        localcfg = { 'TF_GPU': args.tf_gpu, 'source_path': None }
+        if args.source != None:
+            localcfg['source_path'] = args.source[0]
 
         try:
             pool = mp.Pool(ncpus, initializer=worker, initargs=(queue, localcfg))

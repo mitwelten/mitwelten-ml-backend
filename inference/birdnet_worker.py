@@ -38,6 +38,7 @@ class BirdnetWorker(object):
         self.week = None
         self.timestamp = None
         self.config = None
+        self.source_path = None
 
     def __del__(self):
         self.cursor.close()
@@ -132,14 +133,19 @@ class BirdnetWorker(object):
             samples = []
             timestamps = []
 
-            client = Minio(
-                crd.minio.host,
-                access_key=crd.minio.access_key,
-                secret_key=crd.minio.secret_key,
-            )
-            tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
-            client.fget_object(crd.minio.bucket, self.object_name, tmppath)
-            file = sf.SoundFile(tmppath)
+            file = None
+            if self.source_path == None:
+                client = Minio(
+                    crd.minio.host,
+                    access_key=crd.minio.access_key,
+                    secret_key=crd.minio.secret_key,
+                )
+                tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
+                client.fget_object(crd.minio.bucket, self.object_name, tmppath)
+                file = sf.SoundFile(tmppath)
+            else:
+                file = sf.SoundFile(os.path.join(self.source_path, self.object_name))
+
 
             block_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
             overlap_seek = int(-cfg.SIG_OVERLAP * cfg.SAMPLE_RATE)
