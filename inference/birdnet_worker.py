@@ -67,7 +67,7 @@ class BirdnetWorker(object):
             cfg.LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
 
             MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
-            if localcfg.TF_GPU: # cli flag for the runner to choose between tflite and protobuf model
+            if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
             if cfg.MODEL_PATH != MODEL_PATH:
