@@ -54,15 +54,35 @@ class BirdnetWorker(object):
         ''', (self.task_id,))
         self.file_id, self.object_name, self.timestamp, self.config, self.week = self.cursor.fetchone()
 
+        # define a cli flag for the runner to choose protobuf model
+        cfg.TF_GPU = True
+
+        # db config format:     BirdNET_GLOBAL_2K_V2.1_Model_FP32
+        # protobuf (tf gpu):    checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model
+        # tflite (cpu):         checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model_FP32.tflite
         match = re.search(r'(.*)_(V[0-9\.]+)_(.*)', self.config['model_version'])
         if match:
             parts = match.groups()
             model_begin = parts[0] # BirdNET_GLOBAL_2K
             model_version_short = parts[1] # V2.1
             model_end = parts[2] # Model_FP32
-            cfg.MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
             cfg.MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
             cfg.LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
+
+            MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
+            if cfg.TF_GPU:
+                MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
+
+            if cfg.MODEL_PATH != MODEL_PATH:
+                raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
+
+            # porential cfg isolation issues:
+            # cfg.MODEL_PATH (import, loadModel() etc.)
+            # cfg.TFLITE_THREADS (loadModel(), loadMetaModel())
+            # cfg.MDATA_MODEL_PATH (loadMetaModel())
+            # cfg.LOCATION_FILTER_THRESHOLD (explore())
+            # cfg.LABELS (explore())
+
         else:
             raise ValueError()
 
