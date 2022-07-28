@@ -45,6 +45,7 @@ class BirdnetWorker(object):
 
     def configure(self, task_id, localcfg):
         self.task_id = task_id
+        self.source_path = localcfg['source_path']
         self.cursor.execute(f'''
         select t.file_id, i.object_name, i.time, c.config,
         floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
