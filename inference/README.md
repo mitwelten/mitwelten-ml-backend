@@ -32,7 +32,105 @@ pip install matplotlib pandas
 pip install jupyterlab
 ```
 
-### Running
+### Running (Pipeline)
+
+Use `runner.py` to manage the task queue and run the pipeline.
+
+To schedule tasks, you choose a batch, defined in `birdnet_batches.py`. The files matching the corresponding query
+are added as tasks to the queue, referring to the batch ID. This is a crude mechanism to avoid running the same tasks
+multiple times (a batch can only be added once).
+
+```bash
+# add batch with ID 7
+python runner.py --add-batch 7
+```
+
+In addition to the batch ID, a task refers to a configuration.
+The combination of file ID, batch ID and config ID hasto be unique.
+For now, a default configuration is set:
+
+```json
+{
+  "random": {
+    "gain": 0.23,
+    "seed": 42
+  },
+  "overlap": 0,
+  "species_list": {
+    "auto": {
+      "lat": 47.53774126535403,
+      "lon": 7.613764385606163,
+      "auto_season": false,
+      "loc_filter_thresh": 0.03
+    }
+  },
+  "model_version": "BirdNET_GLOBAL_2K_V2.1_Model_FP32"
+}
+```
+
+The `model_version` refers to the base name of the tflite model file in the BirdNET repository.
+From this string all other related settings are derived (mdata model, labels etc.)
+
+The model type can't be set with this configuration because the BirdNET code doesn't allow for switching the tensorflow
+implemention on the fly. This is OK because we can define the model type depending on the host architecture, depending
+on wether a suitable GPU is present or not:
+Set the attribute `MODEL_PATH` in [`birdnet/config.py`](./birdnet/config.py) accordingly. The pipeline worker will check
+if the rest of the model version specification matches the config set in the DB.
+
+To run the pipeline, select wether to run on GPU with the corresponding flag.
+If the flag is absent, the pipeline runs on CPU.
+
+```bash
+# Run the pipeline (on GPU)
+python runner.py --run --tf-gpu
+```
+
+> _Resoning_: The model type could be read directly from [`birdnet/config.py`](./birdnet/config.py) and compared to the
+> config in DB, but using the flag the choice it more explicit. By default no change in the config file is necessary, the
+> BirdNET repo stays clean and no flag is required, running on CPU. Running on GPU requires a change in the BirdNET repo,
+> which is confirmed by setting the `--tf-gpu` flag for the pipeline runner.
+
+#### Pipeline process
+
+- on `add-batch`, tasks are scheduled with file and config ID, state is set to `pending`
+- idle workers pick tasks, task state is set to `running`
+- on inferrence success
+  - results are written to db
+  - task state is set to `suceeded`
+- on inferrence failure, state is set to `failed`
+- on `reset-failed`, results associated to `failed` tasks are deleted, task state is set to `pending`
+- on `reset-queue`, `pending` and `failed` tasks and associated results are deleted
+
+For option reference try `python runner.py -h`
+
+#### Task states
+
+| state | description         |
+| ----- | ------------------- |
+| 0     | pending (scheduled) |
+| 1     | running             |
+| 2     | suceeded            |
+| 3     | failed              |
+
+#### Configuration options
+
+- `species_list`: species list (one of `auto` | `db` | `file`)
+  - `auto`: use BirdNET to infer species list
+    - `lat`: coordinate
+    - `lon`: coordinate
+    - `auto_season`: infer species list from `time_start`, (if not: create year-list)
+    - `loc_filter_thresh`: locaction filter threshold (0.03)
+  - `db`: selection criteria
+  - `file`: file path
+- `overlap`: $[0, 3)$
+- `random`: specs of padding noise
+  - `seed`: (42)
+  - `gain`: (0.3)
+- `model_version`: model version, see comments above (BirdNET_GLOBAL_2K_V2.1_Model_FP32)
+
+----
+
+### Running (manual)
 
 ```bash
 python birdnet_runner.py --lat 47.53774126535403 --lon 7.613764385606163 --rtype audacity
