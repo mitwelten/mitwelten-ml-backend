@@ -72,7 +72,8 @@ class BirdnetWorker(object):
             if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
-            if cfg.MODEL_PATH != MODEL_PATH:
+            from config import MODEL_PATH as static_model_path
+            if static_model_path != MODEL_PATH:
                 raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
 
             # porential cfg isolation issues:
