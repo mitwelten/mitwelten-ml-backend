@@ -210,6 +210,7 @@ def worker(queue,):
             break
         except:
             print(f'task {task[0]} failed')
+            print(traceback.format_exc(), flush=True)
             cursor.execute(finish_query, (3, task[0],))
         else:
             print(f'task {task[0]} succeeded')
