@@ -42,7 +42,7 @@ class BirdnetWorker(object):
     def __del__(self):
         self.cursor.close()
 
-    def configure(self, task_id):
+    def configure(self, task_id, localcfg):
         self.task_id = task_id
         self.cursor.execute(f'''
         select t.file_id, i.object_name, i.time, c.config,
@@ -53,9 +53,6 @@ class BirdnetWorker(object):
         where t.task_id = %s
         ''', (self.task_id,))
         self.file_id, self.object_name, self.timestamp, self.config, self.week = self.cursor.fetchone()
-
-        # define a cli flag for the runner to choose protobuf model
-        cfg.TF_GPU = True
 
         # db config format:     BirdNET_GLOBAL_2K_V2.1_Model_FP32
         # protobuf (tf gpu):    checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model
@@ -70,7 +67,7 @@ class BirdnetWorker(object):
             cfg.LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
 
             MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
-            if cfg.TF_GPU:
+            if localcfg.TF_GPU: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
             if cfg.MODEL_PATH != MODEL_PATH:

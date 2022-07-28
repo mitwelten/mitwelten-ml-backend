@@ -173,7 +173,7 @@ class Runner(object):
         print(f'reset to pending on {self.cursor.rowcount} tasks')
         self.connection.commit()
 
-def worker(queue,):
+def worker(queue, localcfg):
     '''Read tasks from queue and process them using BirdnetWorker'''
 
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
@@ -198,7 +198,7 @@ def worker(queue,):
             break
 
         try:
-            birdnet.configure(task[0])
+            birdnet.configure(task[0], localcfg)
             birdnet.load_species_list()
             birdnet.analyse()
         except KeyboardInterrupt:
@@ -226,6 +226,8 @@ if __name__ == '__main__':
     parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
     parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
 
+    parser.add_argument('--tf-gpu', action='store_true', default=False, help='Run on GPU, using protobuf model')
+
     args = parser.parse_args()
 
     runner = Runner()
@@ -244,9 +246,10 @@ if __name__ == '__main__':
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         ncpus = os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
+        localcfg = { 'TF_GPU': args.tf_gpu }
 
         try:
-            pool = mp.Pool(ncpus, initializer=worker, initargs=(queue,))
+            pool = mp.Pool(ncpus, initializer=worker, initargs=(queue, localcfg))
 
             for task in runner.get_tasks():
                 queue.put(task)
