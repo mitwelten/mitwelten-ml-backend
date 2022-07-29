@@ -259,7 +259,7 @@ if __name__ == '__main__':
 
     if args.run:
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-        ncpus = os.cpu_count()
+        ncpus = 1 if args.tf_gpu else os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
         localcfg = { 'TF_GPU': args.tf_gpu, 'source_path': args.source }
 
