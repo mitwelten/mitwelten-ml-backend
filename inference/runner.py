@@ -110,11 +110,11 @@ class Runner(object):
                 # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
                 cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
                 update {crd.db.schema}.birdnet_tasks
-                set state = 1, pickup_on = now()
+                set state = 1
                 where task_id in (
                     select task_id from {crd.db.schema}.birdnet_tasks
                     where state = 0
-                    order by task_id
+                    -- order by task_id -- this is very expensive
                     for update skip locked
                     limit 1
                 )
@@ -173,12 +173,18 @@ class Runner(object):
         print(f'reset to pending on {self.cursor.rowcount} tasks')
         self.connection.commit()
 
-def worker(queue,):
+def worker(queue, localcfg):
     '''Read tasks from queue and process them using BirdnetWorker'''
 
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
     cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
+
+    start_query = f'''
+    update {crd.db.schema}.birdnet_tasks
+    set pickup_on = now()
+    where task_id = %s
+    '''
 
     finish_query = f'''
     update {crd.db.schema}.birdnet_tasks
@@ -198,7 +204,9 @@ def worker(queue,):
             break
 
         try:
-            birdnet.configure(task[0])
+            cursor.execute(start_query, (task[0],))
+            connection.commit()
+            birdnet.configure(task[0], localcfg)
             birdnet.load_species_list()
             birdnet.analyse()
         except KeyboardInterrupt:
@@ -210,6 +218,7 @@ def worker(queue,):
             break
         except:
             print(f'task {task[0]} failed')
+            print(traceback.format_exc(), flush=True)
             cursor.execute(finish_query, (3, task[0],))
         else:
             print(f'task {task[0]} succeeded')
@@ -217,13 +226,30 @@ def worker(queue,):
         finally:
             connection.commit()
 
+def is_readable_dir(arg):
+    try:
+        if os.path.isfile(arg):
+            arg = os.path.dirname(arg)
+        if os.path.isdir(arg) and os.access(arg, os.R_OK):
+            return arg
+        else:
+            raise f'{arg}: Directory not accessible'
+    except Exception as e:
+        raise ValueError(f'Can\'t read directory/file {arg}')
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Run and manage BirdNET inferrence queue')
-    parser.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
-    parser.add_argument('--reset-failed', action='store_true', default=False, help='Reset failed tasks to pending, clearing results')
-    parser.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
-    parser.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
+
+    p_manage = parser.add_argument_group('Manage Task Queue')
+    p_manage.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')
+    p_manage.add_argument('--reset-failed', action='store_true', default=False, help='Reset failed tasks to pending, clearing results')
+    p_manage.add_argument('--add-batch', type=int, metavar='ID', help='Queue files defined by batch of ID')
+
+    p_run = parser.add_argument_group('Run Pipeline')
+    p_run.add_argument('--run', action='store_true', default=False, help='Work on tasks in queue')
+    p_run.add_argument('--tf-gpu', action='store_true', default=False, help='Run on GPU, using protobuf model')
+    p_run.add_argument('--source', metavar='PATH', type=lambda x: is_readable_dir(x), help='Read input from disk at PATH instead of S3')
 
     args = parser.parse_args()
 
@@ -241,11 +267,12 @@ if __name__ == '__main__':
 
     if args.run:
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-        ncpus = os.cpu_count()
+        ncpus = 1 if args.tf_gpu else os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
+        localcfg = { 'TF_GPU': args.tf_gpu, 'source_path': args.source }
 
         try:
-            pool = mp.Pool(ncpus, initializer=worker, initargs=(queue,))
+            pool = mp.Pool(ncpus, initializer=worker, initargs=(queue, localcfg))
 
             for task in runner.get_tasks():
                 queue.put(task)

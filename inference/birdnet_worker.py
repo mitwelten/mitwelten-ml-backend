@@ -38,12 +38,16 @@ class BirdnetWorker(object):
         self.week = None
         self.timestamp = None
         self.config = None
+        self.source_path = None
+
+        cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
 
     def __del__(self):
         self.cursor.close()
 
-    def configure(self, task_id):
+    def configure(self, task_id, localcfg):
         self.task_id = task_id
+        self.source_path = localcfg['source_path']
         self.cursor.execute(f'''
         select t.file_id, i.object_name, i.time, c.config,
         floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
@@ -54,22 +58,38 @@ class BirdnetWorker(object):
         ''', (self.task_id,))
         self.file_id, self.object_name, self.timestamp, self.config, self.week = self.cursor.fetchone()
 
+        # db config format:     BirdNET_GLOBAL_2K_V2.1_Model_FP32
+        # protobuf (tf gpu):    checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model
+        # tflite (cpu):         checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model_FP32.tflite
         match = re.search(r'(.*)_(V[0-9\.]+)_(.*)', self.config['model_version'])
         if match:
             parts = match.groups()
             model_begin = parts[0] # BirdNET_GLOBAL_2K
             model_version_short = parts[1] # V2.1
             model_end = parts[2] # Model_FP32
-            cfg.MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
-            cfg.MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
-            cfg.LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
+            MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
+            LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
+            MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
+            if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
+                MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
+
+            if os.path.basename(cfg.MODEL_PATH) != os.path.basename(MODEL_PATH):
+                raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
+
+            cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MODEL_PATH)
+            cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', LABELS_FILE)
+            cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MDATA_MODEL_PATH)
+
+            # porential cfg isolation issues:
+            # cfg.MODEL_PATH (import, loadModel() etc.)
+            # cfg.TFLITE_THREADS (loadModel(), loadMetaModel())
+            # cfg.MDATA_MODEL_PATH (loadMetaModel())
+            # cfg.LOCATION_FILTER_THRESHOLD (explore())
+            # cfg.LABELS (explore())
+
         else:
             raise ValueError()
 
-        cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.MODEL_PATH)
-        cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.LABELS_FILE)
-        cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.MDATA_MODEL_PATH)
-        cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
 
         # error loggin handled elsewhere
         cfg.ERROR_LOG_FILE = None
@@ -115,14 +135,19 @@ class BirdnetWorker(object):
             samples = []
             timestamps = []
 
-            client = Minio(
-                crd.minio.host,
-                access_key=crd.minio.access_key,
-                secret_key=crd.minio.secret_key,
-            )
-            tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
-            client.fget_object(crd.minio.bucket, self.object_name, tmppath)
-            file = sf.SoundFile(tmppath)
+            file = None
+            if self.source_path == None:
+                client = Minio(
+                    crd.minio.host,
+                    access_key=crd.minio.access_key,
+                    secret_key=crd.minio.secret_key,
+                )
+                tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
+                client.fget_object(crd.minio.bucket, self.object_name, tmppath)
+                file = sf.SoundFile(tmppath)
+            else:
+                file = sf.SoundFile(os.path.join(self.source_path, self.object_name))
+
 
             block_size = int(cfg.SIG_LENGTH * cfg.SAMPLE_RATE)
             overlap_seek = int(-cfg.SIG_OVERLAP * cfg.SAMPLE_RATE)
