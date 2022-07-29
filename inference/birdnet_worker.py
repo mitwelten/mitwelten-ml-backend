@@ -73,12 +73,10 @@ class BirdnetWorker(object):
             if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
-            MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MODEL_PATH)
-            if cfg.MODEL_PATH != MODEL_PATH:
+            if os.path.basename(cfg.MODEL_PATH) != os.path.basename(MODEL_PATH):
                 raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
-            else:
-                cfg.MODEL_PATH = MODEL_PATH
 
+            cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MODEL_PATH)
             cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', LABELS_FILE)
             cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MDATA_MODEL_PATH)
 
