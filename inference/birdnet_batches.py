@@ -85,3 +85,30 @@ where sample_rate = 48000 and duration >= 3 and not exists (
     select from {SCHEMA}.birdnet_results o where i.object_name = o.object_name
 )
 '''}
+
+batches[7] = {
+'comment': 'FS2: 8367-2852',
+'query': f'''
+select file_id, object_name,
+floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+from dev.birdnet_input i
+where time > '2022-03-01 00:00:00+02' and sample_rate = 48000 and duration >= 3 and node_label = '8367-2852'
+'''}
+
+batches[8] = {
+'comment': 'FS2: 8537-4761',
+'query': f'''
+select file_id, object_name,
+floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+from dev.birdnet_input i
+where time > '2022-03-01 00:00:00+02' and sample_rate = 48000 and duration >= 3 and node_label = '8537-4761'
+'''}
+
+batches[9] = {
+'comment': 'FS2: 8542-0446',
+'query': f'''
+select file_id, object_name,
+floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
+from dev.birdnet_input i
+where time > '2022-03-01 00:00:00+02' and sample_rate = 48000 and duration >= 3 and node_label = '8542-0446'
+'''}
