@@ -114,7 +114,7 @@ class Runner(object):
                 where task_id in (
                     select task_id from {crd.db.schema}.birdnet_tasks
                     where state = 0
-                    order by task_id
+                    -- order by task_id -- this is very expensive
                     for update skip locked
                     limit 1
                 )
