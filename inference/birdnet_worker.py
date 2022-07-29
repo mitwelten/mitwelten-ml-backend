@@ -40,6 +40,8 @@ class BirdnetWorker(object):
         self.config = None
         self.source_path = None
 
+        cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
+
     def __del__(self):
         self.cursor.close()
 
@@ -65,16 +67,20 @@ class BirdnetWorker(object):
             model_begin = parts[0] # BirdNET_GLOBAL_2K
             model_version_short = parts[1] # V2.1
             model_end = parts[2] # Model_FP32
-            cfg.MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
-            cfg.LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
-
+            MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
+            LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
             MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
             if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
-            from config import MODEL_PATH as static_model_path
-            if static_model_path != MODEL_PATH:
+            MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MODEL_PATH)
+            if cfg.MODELPATH != MODEL_PATH:
                 raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
+            else:
+                cfg.MODELPATH = MODEL_PATH
+
+            cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', LABELS_FILE)
+            cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MDATA_MODEL_PATH)
 
             # porential cfg isolation issues:
             # cfg.MODEL_PATH (import, loadModel() etc.)
@@ -86,10 +92,6 @@ class BirdnetWorker(object):
         else:
             raise ValueError()
 
-        cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.MODEL_PATH)
-        cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.LABELS_FILE)
-        cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.MDATA_MODEL_PATH)
-        cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
 
         # error loggin handled elsewhere
         cfg.ERROR_LOG_FILE = None
