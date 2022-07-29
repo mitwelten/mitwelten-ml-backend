@@ -261,9 +261,7 @@ if __name__ == '__main__':
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
         ncpus = os.cpu_count()
         queue = mp.Queue(maxsize=ncpus)
-        localcfg = { 'TF_GPU': args.tf_gpu, 'source_path': None }
-        if args.source != None:
-            localcfg['source_path'] = args.source[0]
+        localcfg = { 'TF_GPU': args.tf_gpu, 'source_path': args.source }
 
         try:
             pool = mp.Pool(ncpus, initializer=worker, initargs=(queue, localcfg))
