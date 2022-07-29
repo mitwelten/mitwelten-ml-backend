@@ -77,12 +77,20 @@ on wether a suitable GPU is present or not:
 Set the attribute `MODEL_PATH` in [`birdnet/config.py`](./birdnet/config.py) accordingly. The pipeline worker will check
 if the rest of the model version specification matches the config set in the DB.
 
-To run the pipeline, select wether to run on GPU with the corresponding flag.
+To run the pipeline, select wether to run on GPU with the corresponding flag (`--tf-gpu`).
 If the flag is absent, the pipeline runs on CPU.
+
+Running on the GPU benefits from a batch size > 1 (set it in [`birdnet/config.py`](./birdnet/config.py)).
+To suppress the verbose inferrence output of tensorflow, set `PBMODEL.predict(sample, verbose=0)` in [`birdnet/model.py`](./birdnet/model.py).
+
+To read the input data from storage instead of S3, i.e. NFS, specify the root path with the `--source` option.
 
 ```bash
 # Run the pipeline (on GPU)
 python runner.py --run --tf-gpu
+
+# Read input from storage instead of S3
+python runner.py --run --tf-gpu --source /mitwelten
 ```
 
 > _Resoning_: The model type could be read directly from [`birdnet/config.py`](./birdnet/config.py) and compared to the
