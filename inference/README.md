@@ -136,6 +136,34 @@ For option reference try `python runner.py -h`
   - `gain`: (0.3)
 - `model_version`: model version, see comments above (BirdNET_GLOBAL_2K_V2.1_Model_FP32)
 
+#### Performance / Benchmark
+
+Hardware constraints:
+
+- 10 CPU Cores
+- 1 vGPU (NVIDIA Tesla P6-4Q), 4 GB VRAM
+- 64 GB RAM
+- NFS access to input
+
+The 4 GB VRAM allow only one worker to run at a time.
+The CPU model can't handle batch sizes > 1.
+
+A few tests on a set of 20 files of 15min length yield the following results:
+
+| platform | batchsize | n procs | avg      | total    |
+| -------- | --------- | ------- | -------- | -------- |
+| CPU      |         1 |       1 | 00:38.68 | 00:12:54 |
+| CPU      |         1 |      10 | 01:04.24 | 00:02:19 |
+| -------- | --------- | ------- | -------- | -------- |
+| GPU      |         1 |       1 | 00:21.08 | 00:07:02 |
+| GPU      |        32 |       1 | 00:03.06 | 00:01:01 |
+| GPU      |       256 |       1 | 00:02.85 | 00:00:57 |
+
+Even with 10 tasks running in parallel on CPU it is outperformed by the GPU with
+less than half of total run time (02:19 vs. 00:57).
+This will get slightly worse when running on the smaller filesize (55s), as it
+sums up to 21 batches (with no overlap). Currently the inferrence takes ~330ms.
+
 ----
 
 ### Running (manual)
