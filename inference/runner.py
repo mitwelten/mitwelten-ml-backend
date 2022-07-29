@@ -110,7 +110,7 @@ class Runner(object):
                 # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
                 cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
                 update {crd.db.schema}.birdnet_tasks
-                set state = 1, pickup_on = now()
+                set state = 1
                 where task_id in (
                     select task_id from {crd.db.schema}.birdnet_tasks
                     where state = 0
@@ -180,6 +180,12 @@ def worker(queue, localcfg):
     cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
 
+    start_query = f'''
+    update {crd.db.schema}.birdnet_tasks
+    set pickup_on = now()
+    where task_id = %s
+    '''
+
     finish_query = f'''
     update {crd.db.schema}.birdnet_tasks
     set state = %s, end_on = now()
@@ -198,6 +204,8 @@ def worker(queue, localcfg):
             break
 
         try:
+            cursor.execute(start_query, (task[0],))
+            connection.commit()
             birdnet.configure(task[0], localcfg)
             birdnet.load_species_list()
             birdnet.analyse()
