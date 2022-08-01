@@ -140,6 +140,12 @@ def image_meta_worker(row):
         meta['path'] = path
     return meta
 
+def store_task_state(conn: sqlite3.Connection, file_id: int, state: int):
+    c = conn.cursor()
+    c.execute('update files set state = ? where file_id = ?', [state, file_id])
+    conn.commit()
+    c.close()
+
 def worker(queue: Queue):
 
     conn = sqlite3.connect('file_index.db')
@@ -160,11 +166,19 @@ def worker(queue: Queue):
 
         # connect to S3 storage
         storage = Minio(crd.minio.host, access_key=crd.minio.access_key, secret_key=crd.minio.secret_key)
-        if not storage.bucket_exists(crd.minio.bucket):
-            print(f'Bucket {crd.minio.bucket} does not exist.')
-            # TODO: retry in 10 minutes, task is not done
-            # TODO: check if other exceptions are raised
-            break
+        try:
+            # the documentation states this would be false if bucked doesn't exist
+            # but instead an exception is raised MinioException, code=AccessDenied
+            if not storage.bucket_exists(crd.minio.bucket):
+                raise RuntimeError(f'Bucket {crd.minio.bucket} does not exist.')
+        except Exception as e:
+            print('Connecting to S3 bucket failed:', str(e))
+            # mark paused
+            store_task_state(conn, record['file_id'], 42)
+            queue.task_done()
+            # wait 10min before running into the same problem with the next task
+            time.sleep(600)
+            continue
 
         # set up session for REST backend
         api = requests.Session()
@@ -174,8 +188,12 @@ def worker(queue: Queue):
             r.raise_for_status()
         except Exception as e:
             print('Connecting to REST backend failed:', str(e))
-            # TODO: retry in 10 minutes, task is not done
-            break
+            # mark paused
+            store_task_state(conn, record['file_id'], 42)
+            queue.task_done()
+            # wait 10min before running into the same problem with the next task
+            time.sleep(600)
+            continue
 
         d = record
         cur = conn.cursor()
