@@ -491,7 +491,7 @@ def main():
                 if not check_ontime(cfg.upload, args.timed):
                     continue
 
-                queue = Queue(maxsize=nthreads_upload)
+                queue = Queue(maxsize=1)
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
                 for task in get_tasks(database):
                     queue.put(task)
@@ -500,12 +500,13 @@ def main():
                 # drain the queue and reset drained tasks
                 try:
                     while True:
-                        task = queue.get(True, 2)
+                        task = queue.get()
                         c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
+                        queue.task_done()
                 except QueueEmpty:
                     database.commit()
                 except:
-                    print(traceback.format_exc(), flush=True)
+                    print(traceback.format_exc())
 
                 # close queue and stop worker threads
                 print('signaling threads to stop...')
