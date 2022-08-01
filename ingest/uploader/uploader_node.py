@@ -439,6 +439,7 @@ def main():
                     for meta in metalist:
                         try:
                             if len(meta) == 2:
+                                # meta only contains file_id and path == extraction failed
                                 raise ValueError
                             c.execute('''
                             update files set (sha256, state, file_size, node_label, timestamp, resolution_x, resolution_y, checked_at)
