@@ -333,12 +333,13 @@ def get_tasks(conn: sqlite3.Connection):
                 if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
         except GeneratorExit:
+            c.close()
             # reset the last picked up task
             if file_id:
+                c = conn.cursor()
                 c.execute('update files set state = 1 where file_id = ?', [file_id])
                 conn.commit()
-            c.close()
-            raise Exception('KeyboardInterrupt')
+                c.close()
         except:
             c.close()
             if VERBOSE: print(traceback.format_exc(), flush=True)
