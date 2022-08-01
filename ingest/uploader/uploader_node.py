@@ -571,7 +571,8 @@ def main():
                 time.sleep(300)
 
             else:
-                time.sleep(300)
+                if sig_ctrl['run']: time.sleep(300)
+                else: break
 
         database.close()
         sys.exit(0)
