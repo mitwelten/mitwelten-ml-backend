@@ -526,21 +526,24 @@ def main():
                 queue = Queue(maxsize=1)
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
                 for task in get_tasks(database):
-                    queue.put(task)
                     if not sig_ctrl['run']:
                         raise ShutdownRequestException
+                    queue.put(task)
 
             except ShutdownRequestException:
+                print('ShutdownRequestException')
                 # drain the queue and reset drained tasks
                 try:
                     while True:
                         task = queue.get()
+                        print('resetting task', task['file_id'])
                         c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
                         queue.task_done()
                 except QueueEmpty:
+                    print('A', traceback.format_exc())
                     database.commit()
                 except:
-                    print(traceback.format_exc())
+                    print('B', traceback.format_exc())
 
                 # close queue and stop worker threads
                 print('signaling threads to stop...')
