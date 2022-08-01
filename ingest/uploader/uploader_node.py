@@ -14,7 +14,7 @@ import requests
 from multiprocessing.pool import ThreadPool
 from queue import Queue, Empty as QueueEmpty
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from minio import Minio
 from minio.commonconfig import Tags
 from PIL import Image
@@ -442,7 +442,8 @@ def main():
                         break
                     print(f'processing batch {1 + (i // BATCHSIZE)} of {1 + (len(records) // BATCHSIZE)} ({BATCHSIZE} items)')
                     metalist = []
-                    with ThreadPoolExecutor(nthreads_meta) as executor:
+                    # Using ProcessPool instread of ThreadPool saves a few seconds
+                    with ProcessPoolExecutor(nthreads_meta) as executor:
                         metalist = executor.map(image_meta_worker, batch)
                     if VERBOSE: print('\n== writing batch to database...')
                     for meta in metalist:
