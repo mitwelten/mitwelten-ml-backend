@@ -325,14 +325,14 @@ def get_tasks(conn: sqlite3.Connection):
                 yield d
             else:
                 c.close()
-                print('sleeping...', end='\r')
+                if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
         except KeyboardInterrupt:
             c.close()
             raise Exception('KeyboardInterrupt')
         except:
             c.close()
-            print(traceback.format_exc(), flush=True)
+            if VERBOSE: print(traceback.format_exc(), flush=True)
             raise
 
 def check_ontime(cfg: cfg.NodeUploaderConfig, timed: bool) -> bool:
@@ -356,6 +356,9 @@ def main():
     parser.add_argument('--meta', action='store_true', help='check files and extract and metadata')
     parser.add_argument('--upload', action='store_true', help='upload checked files')
     parser.add_argument('--test', action='store_true', help='select some records')
+    parser.add_argument('--resume', action='store_true', help='resume upload for paused tasks')
+    parser.add_argument('--pause', action='store_true', help='pause upload for checked tasks')
+    parser.add_argument('--retry', action='store_true', help='retry failed uploads')
 
     parser.add_argument('--timed', action='store_true', help='only run in configured time period')
     parser.add_argument('--threads', metavar='NTHREADS', help='number of threads to spawn', default=4)
@@ -396,6 +399,24 @@ def main():
     if args.test:
         r = c.execute('select * from files limit 20').fetchall()
         pprint(r)
+        database.close()
+        return
+
+    if args.pause:
+        r = c.execute('update files set state = 42 where state = 1')
+        database.commit()
+        database.close()
+        return
+
+    if args.resume:
+        r = c.execute('update files set state = 1 where state = 42')
+        database.commit()
+        database.close()
+        return
+
+    if args.retry:
+        r = c.execute('update files set state = 1 where state in (-4, -5, -6, -7)')
+        database.commit()
         database.close()
         return
 
