@@ -544,7 +544,7 @@ def main():
                 # drain the queue and reset drained tasks
                 try:
                     while True:
-                        task = queue.get()
+                        task = queue.get(True, 1)
                         print('resetting task', task['file_id'])
                         c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
                         queue.task_done()
