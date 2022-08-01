@@ -535,34 +535,31 @@ def main():
                         raise ShutdownRequestException
 
             except ShutdownRequestException:
-                print('ShutdownRequestException')
                 tasks.close()
                 # drain the queue and reset drained tasks
                 try:
                     while True:
                         task = queue.get(True, 1)
-                        print('resetting task', task['file_id'])
                         c.execute('update files set state = 1 where file_id = ?', (task['file_id'],))
                         queue.task_done()
                 except QueueEmpty:
-                    print('A', traceback.format_exc())
                     database.commit()
                 except:
-                    print('B', traceback.format_exc())
+                    print(traceback.format_exc())
 
                 # close queue and stop worker threads
-                print('signaling threads to stop...')
+                if VERBOSE: print('signaling threads to stop...')
                 for n in range(nthreads_upload):
                     queue.put(None)
 
-                print('closing queue...')
+                if VERBOSE: print('closing queue...')
                 queue.join()
 
-                print('waiting for tasks to end...')
+                if VERBOSE: print('waiting for tasks to end...')
                 pool.close()
                 pool.join()
 
-                print('done.')
+                if VERBOSE: print('done.')
                 break
 
             except Exception as e:
