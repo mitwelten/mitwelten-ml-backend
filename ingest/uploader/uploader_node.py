@@ -37,8 +37,11 @@ class MetadataInsertException(BaseException):
 class ShutdownRequestException(BaseException):
     ...
 
+sig_ctrl = { 'run': True }
+
 def sigterm_handler(signo, stack_frame):
-    raise ShutdownRequestException
+    print('Got signal to stop running:', signo)
+    sig_ctrl['run'] = False
 
 def is_readable_dir(arg):
     try:
@@ -524,8 +527,10 @@ def main():
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
                 for task in get_tasks(database):
                     queue.put(task)
+                    if not sig_ctrl['run']:
+                        raise ShutdownRequestException
 
-            except ShutdownRequestException or KeyboardInterrupt:
+            except ShutdownRequestException:
                 # drain the queue and reset drained tasks
                 try:
                     while True:
