@@ -158,13 +158,10 @@ def worker(queue: Queue):
             queue.task_done()
             break
 
-        cur = conn.cursor()
-
         # connect to S3 storage
         storage = Minio(crd.minio.host, access_key=crd.minio.access_key, secret_key=crd.minio.secret_key)
         if not storage.bucket_exists(crd.minio.bucket):
             print(f'Bucket {crd.minio.bucket} does not exist.')
-            cur.close()
             # TODO: retry in 10 minutes, task is not done
             # TODO: check if other exceptions are raised
             break
@@ -177,11 +174,11 @@ def worker(queue: Queue):
             r.raise_for_status()
         except Exception as e:
             print('Connecting to REST backend failed:', str(e))
-            cur.close()
             # TODO: retry in 10 minutes, task is not done
             break
 
         d = record
+        cur = conn.cursor()
 
         # validate record against database
         try:
