@@ -161,13 +161,8 @@ def worker(queue: Queue):
         cur = conn.cursor()
 
         # connect to S3 storage
-        storage = Minio(
-            crd.minio.host,
-            access_key=crd.minio.access_key,
-            secret_key=crd.minio.secret_key,
-        )
-        bucket_exists = storage.bucket_exists(crd.minio.bucket)
-        if not bucket_exists:
+        storage = Minio(crd.minio.host, access_key=crd.minio.access_key, secret_key=crd.minio.secret_key)
+        if not storage.bucket_exists(crd.minio.bucket):
             print(f'Bucket {crd.minio.bucket} does not exist.')
             cur.close()
             # TODO: retry in 10 minutes, task is not done
