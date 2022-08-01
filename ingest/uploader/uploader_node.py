@@ -328,6 +328,8 @@ def get_tasks(conn: sqlite3.Connection):
             else:
                 if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
+                if not sig_ctrl['run']:
+                    break
         except GeneratorExit:
             # reset the last picked up task
             if file_id:
