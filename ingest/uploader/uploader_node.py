@@ -400,9 +400,7 @@ def main():
                     values (?, 0, strftime('%s'))
                     ''',[(path,) for path in batch])
                     database.commit()
-            except KeyboardInterrupt:
-                break
-            except ShutdownRequestException:
+            except ShutdownRequestException or KeyboardInterrupt:
                 break
             except Exception as e:
                 # print error but continue
@@ -461,9 +459,7 @@ def main():
                             ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
                     database.commit()
 
-            except ShutdownRequestException:
-                break
-            except KeyboardInterrupt:
+            except ShutdownRequestException or KeyboardInterrupt:
                 break
             except Exception as e:
                 # print error but continue
