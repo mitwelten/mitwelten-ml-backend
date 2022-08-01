@@ -317,31 +317,23 @@ def get_tasks(conn: sqlite3.Connection):
     while True:
         file_id = None
         try:
-            c = conn.cursor()
-            r = c.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
-
+            r = conn.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
             d = {}
             if r:
                 d = {k: r[i] for (i,k) in enumerate(COLS)}
                 file_id = d['file_id']
-                c.execute('update files set state = 3 where file_id = ?', [file_id])
+                conn.execute('update files set state = 3 where file_id = ?', [file_id])
                 conn.commit()
-                c.close()
                 yield d
             else:
-                c.close()
                 if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
         except GeneratorExit:
-            c.close()
             # reset the last picked up task
             if file_id:
-                c = conn.cursor()
-                c.execute('update files set state = 1 where file_id = ?', [file_id])
+                conn.execute('update files set state = 1 where file_id = ?', [file_id])
                 conn.commit()
-                c.close()
         except:
-            c.close()
             if VERBOSE: print(traceback.format_exc(), flush=True)
             raise
 
