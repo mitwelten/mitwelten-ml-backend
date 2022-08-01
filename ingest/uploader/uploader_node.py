@@ -333,6 +333,7 @@ def get_tasks(conn: sqlite3.Connection):
             if file_id:
                 conn.execute('update files set state = 1 where file_id = ?', [file_id])
                 conn.commit()
+            break
         except:
             if VERBOSE: print(traceback.format_exc(), flush=True)
             raise
@@ -527,9 +528,9 @@ def main():
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
 
                 for task in tasks:
+                    queue.put(task)
                     if not sig_ctrl['run']:
                         raise ShutdownRequestException
-                    queue.put(task)
 
             except ShutdownRequestException:
                 print('ShutdownRequestException')
