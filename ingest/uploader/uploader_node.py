@@ -426,7 +426,10 @@ def main():
         return
 
     if args.index:
+
+        # TODO: make ShutdownRequestException work (use a different handler)
         signal.signal(signal.SIGTERM, sigterm_handler)
+
         while True:
             try:
                 print('indexing')
@@ -459,8 +462,11 @@ def main():
         sys.exit(0)
 
     if args.meta:
-        nthreads_meta = cfg.meta.threads if cfg.meta.threads else NTHREADS
+
+        # TODO: make ShutdownRequestException work (move loop mechanism to system-d)
         signal.signal(signal.SIGTERM, sigterm_handler)
+        nthreads_meta = cfg.meta.threads if cfg.meta.threads else NTHREADS
+
         while True: # This could be handled in the system unit, restart after exit, with delay
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
@@ -472,7 +478,7 @@ def main():
                 records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
                 for batch, i in chunks(records, BATCHSIZE):
-                    if not check_ontime(cfg.meta, args.timed):
+                    if not check_ontime(cfg.meta, args.timed) or not sig_ctrl['run']:
                         break
                     print(f'processing batch {1 + (i // BATCHSIZE)} of {1 + (len(records) // BATCHSIZE)} ({BATCHSIZE} items)')
                     metalist = []
@@ -516,10 +522,12 @@ def main():
     if args.upload:
 
         signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGINT, sigterm_handler)
+
         nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
         tasks = get_tasks(database)
 
-        while True: # This could be handled in the system unit, restart after exit, with delay
+        while sig_ctrl['run']: # This could be handled in the system unit, restart after exit, with delay
             try:
 
                 # TODO: move to worker. like this it doesn't stop the worker from running
