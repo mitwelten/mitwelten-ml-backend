@@ -315,6 +315,7 @@ def get_tasks(conn: sqlite3.Connection):
     '''
 
     while True:
+        file_id = None
         try:
             c = conn.cursor()
             r = c.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
@@ -322,7 +323,8 @@ def get_tasks(conn: sqlite3.Connection):
             d = {}
             if r:
                 d = {k: r[i] for (i,k) in enumerate(COLS)}
-                c.execute('update files set state = 3 where file_id = ?', [d['file_id']])
+                file_id = d['file_id']
+                c.execute('update files set state = 3 where file_id = ?', [file_id])
                 conn.commit()
                 c.close()
                 yield d
@@ -330,7 +332,11 @@ def get_tasks(conn: sqlite3.Connection):
                 c.close()
                 if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
-        except KeyboardInterrupt:
+        except GeneratorExit:
+            # reset the last picked up task
+            if file_id:
+                c.execute('update files set state = 1 where file_id = ?', [file_id])
+                conn.commit()
             c.close()
             raise Exception('KeyboardInterrupt')
         except:
@@ -515,6 +521,7 @@ def main():
 
         signal.signal(signal.SIGTERM, sigterm_handler)
         nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
+        tasks = get_tasks(database)
 
         while True: # This could be handled in the system unit, restart after exit, with delay
             try:
@@ -525,13 +532,15 @@ def main():
 
                 queue = Queue(maxsize=1)
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
-                for task in get_tasks(database):
+
+                for task in tasks:
                     if not sig_ctrl['run']:
                         raise ShutdownRequestException
                     queue.put(task)
 
             except ShutdownRequestException:
                 print('ShutdownRequestException')
+                tasks.close()
                 # drain the queue and reset drained tasks
                 try:
                     while True:
