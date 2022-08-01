@@ -195,7 +195,7 @@ def worker(queue: Queue):
             elif validation['node_deployed'] == False:
                 cur.execute('update files set state = -6 where file_id = ?', [d['file_id']])
                 conn.commit()
-                raise Exception('node is not deployed requested time:', d['node_label'], d['timestamp'].isoformat())
+                raise Exception('node is/was not deployed at requested time:', d['node_label'], d['timestamp'].isoformat())
             else:
                 if VERBOSE: print('new file:', validation['object_name'])
                 d['object_name'] = validation['object_name']
