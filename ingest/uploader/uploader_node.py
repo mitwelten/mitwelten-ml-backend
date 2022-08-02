@@ -584,7 +584,7 @@ def main():
         sys.exit(0)
 
     if args.move_corrupted:
-        records = c.execute('select file_id, path from files state = -1').fetchall()
+        records = c.execute('select file_id, path from files where state = -1').fetchall()
         target_dir = '/mnt/elements/corrupted/'
         moved = []
 
