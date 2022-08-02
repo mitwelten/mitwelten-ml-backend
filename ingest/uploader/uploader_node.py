@@ -6,6 +6,7 @@ import traceback
 import argparse
 import mimetypes
 import os
+import shutil
 from pprint import pprint
 import re
 from datetime import datetime, timezone
