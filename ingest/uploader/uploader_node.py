@@ -364,6 +364,7 @@ def main():
     parser.add_argument('--resume', action='store_true', help='resume upload for paused tasks')
     parser.add_argument('--pause', action='store_true', help='pause upload for checked tasks')
     parser.add_argument('--retry', action='store_true', help='retry failed uploads')
+    parser.add_argument('--move-corrupted', action='store_true', help='move corrupted files to dedicated directory')
 
     parser.add_argument('--timed', action='store_true', help='only run in configured time period')
     parser.add_argument('--threads', metavar='NTHREADS', help='number of threads to spawn', default=4)
@@ -581,6 +582,24 @@ def main():
 
         database.close()
         sys.exit(0)
+
+    if args.move_corrupted:
+        records = c.execute('select file_id, path from files state = -1').fetchall()
+        target_dir = '/mnt/elements/corrupted/'
+        moved = []
+
+        if records != None:
+            try:
+                for file_id, path in records:
+                    if VERBOSE: print(f'moving ({file_id}) {path} to {target_dir}')
+                    shutil.move(path, os.path.join(target_dir,os.path.basename(path)))
+                    moved.append([5, file_id])
+            except:
+                print(traceback.format_exc())
+
+        if len(moved) > 0:
+            c.executemany('update files set state = ? where file_id = ?', moved)
+            database.commit()
 
     database.close()
 
