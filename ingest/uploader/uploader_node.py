@@ -380,6 +380,7 @@ def main():
     parser.add_argument('--resume', action='store_true', help='resume upload for paused tasks')
     parser.add_argument('--pause', action='store_true', help='pause upload for checked tasks')
     parser.add_argument('--retry', action='store_true', help='retry failed uploads')
+    parser.add_argument('--check-metadupes', action='store_true', help='check if meta-dupes are in s3. if so, delete locally')
     parser.add_argument('--move-corrupted', action='store_true', help='move corrupted files to dedicated directory')
 
     parser.add_argument('--timed', action='store_true', help='only run in configured time period')
@@ -598,6 +599,38 @@ def main():
 
         database.close()
         sys.exit(0)
+
+    if args.check_metadupes:
+        storage = connect_s3()
+        api = connect_api()
+        records = c.execute('select file_id, path, sha256, file_size from files where state = -3').fetchall()
+        checked = []
+
+        if records != None:
+            try:
+                for file_id, path, sha256, file_size in records:
+                    r = api.get(f'{APIURL}/ingest/image/{sha256}')
+                    data = r.json()
+                    stat = storage.stat_object(crd.minio.bucket, data['object_name'])
+                    if stat.size == file_size:
+                        checked.append([file_id, path])
+                    else:
+                        print('warning, size mismatch', path, '| S3:', stat.size, '| local:', file_size)
+            except:
+                print(traceback.format_exc())
+
+        if len(checked) > 0:
+            deleted = []
+            for file_id, path in checked:
+                try:
+                    print('removing', path)
+                    os.remove(path)
+                except:
+                    print(traceback.format_exc())
+                else:
+                    deleted.append([4, file_id])
+            c.executemany('update files set state = ? where file_id = ?', deleted)
+            database.commit()
 
     if args.move_corrupted:
         records = c.execute('select file_id, path from files where state = -1').fetchall()
