@@ -161,6 +161,15 @@ def connect_s3() -> Minio:
 
     return storage
 
+def connect_api() -> requests.Session:
+    api = requests.Session()
+    api.auth = (crd.api.username, crd.api.password)
+
+    r = api.get(f'{APIURL}/login')
+    r.raise_for_status()
+
+    return api
+
 def worker(queue: Queue):
 
     conn = sqlite3.connect('file_index.db')
@@ -193,11 +202,9 @@ def worker(queue: Queue):
             continue
 
         # set up session for REST backend
-        api = requests.Session()
-        api.auth = (crd.api.username, crd.api.password)
+        api = None
         try:
-            r = api.get(f'{APIURL}/login')
-            r.raise_for_status()
+            api = connect_api()
         except Exception as e:
             print('Connecting to REST backend failed:', str(e))
             # mark paused
