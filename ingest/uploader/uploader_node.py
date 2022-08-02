@@ -150,6 +150,17 @@ def store_task_state(conn: sqlite3.Connection, file_id: int, state: int):
     conn.commit()
     c.close()
 
+def connect_s3() -> Minio:
+    # connect to S3 storage
+    storage = Minio(crd.minio.host, access_key=crd.minio.access_key, secret_key=crd.minio.secret_key)
+
+    # the documentation states this would be false if bucked doesn't exist
+    # but instead an exception is raised MinioException, code=AccessDenied
+    if not storage.bucket_exists(crd.minio.bucket):
+        raise RuntimeError(f'Bucket {crd.minio.bucket} does not exist.')
+
+    return storage
+
 def worker(queue: Queue):
 
     conn = sqlite3.connect('file_index.db')
@@ -169,12 +180,9 @@ def worker(queue: Queue):
             break
 
         # connect to S3 storage
-        storage = Minio(crd.minio.host, access_key=crd.minio.access_key, secret_key=crd.minio.secret_key)
+        storage = None
         try:
-            # the documentation states this would be false if bucked doesn't exist
-            # but instead an exception is raised MinioException, code=AccessDenied
-            if not storage.bucket_exists(crd.minio.bucket):
-                raise RuntimeError(f'Bucket {crd.minio.bucket} does not exist.')
+            storage = connect_s3()
         except Exception as e:
             print('Connecting to S3 bucket failed:', str(e))
             # mark paused
