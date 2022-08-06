@@ -221,7 +221,7 @@ delete --> set_state_4
 | state | description
 | ----- | -----------
 |     0 | indexed, new
-|       | **error states**
+|       | __error states__
 |    -1 | corruption check / meta extraction failed (move)
 |    -2 | duplicate hash/object-name locally (delete)
 |    -3 | duplicate hash/object-name in database (check if exists in s3 then delete warn and keep)
@@ -229,7 +229,7 @@ delete --> set_state_4
 |    -5 | failed to insert metadata in db
 |    -6 | node is/was not deployed at requested time
 |    -7 | file not found locally
-|       | **success states**
+|       | __success states__
 |     1 | checked, no local duplicate, file intact
 |     2 | upload successful
 |     3 | scheduled for upload / upload running
