@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
     QPushButton, QHeaderView, QSizePolicy, QTableView, QWidget)
 
 import re
+from time import time
 import psycopg2 as pg
 from psycopg2 import pool
 
@@ -37,6 +38,7 @@ class Widget(QWidget):
         self.dbPool = None
         self.source = ''
         self.node_label = '0000-0000'
+        self.redraw_timer = time()
 
         # Getting the Model
         self.model = CustomTableModel()
@@ -134,17 +136,23 @@ class Widget(QWidget):
             self.uploadButton.setEnabled(False)
             self.statusLabel.setText(f'No valid audiofiles found. Maybe try another folder?')
 
+    def onIndexIteration(self, count):
+        self.statusLabel.setText(f'Indexing paths: {count}')
+
     def onUploadIteration(self, count, row_id, file_id, etag):
         self.statusLabel.setText(f'Uploaded file with ID {file_id} and etag {etag}')
         # setting value to progress bar
         self.pbar.setValue(count)
-        # update the table
         for r in self.to_upload:
             if r['row_id'] == row_id:
                 r['row_state'] = 1 if etag else 0
-        self.model.layoutChanged.emit()
+        # update the table
+        if (time() - self.redraw_timer) > (max(1, min(60, self.pbar.maximum() / 1000))):
+            self.model.layoutChanged.emit()
+            self.redraw_timer = time()
 
     def onUploadFinished(self, count):
+        self.model.layoutChanged.emit()
         self.statusLabel.setText(f'Upload finished: {count}')
 
     def browseForSource(self):
@@ -156,9 +164,12 @@ class Widget(QWidget):
             return
         if(len(self.source) == 0):
             self.browseForSource()
+        if(len(self.source) == 0):
+            return # browse was cancelled
 
         self.pbar.setValue(0)
         self.metareader = MetaDataReader(self.dbPool, self.source, self.node_label)
+        self.metareader.indexChanged.connect(self.onIndexIteration)
         self.metareader.totalChanged.connect(lambda total: self.pbar.setMaximum(total))
         self.metareader.countChanged.connect(self.onExtractIteration)
         self.metareader.extractFinished.connect(self.onExtractFinished)
