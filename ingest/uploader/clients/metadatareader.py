@@ -8,6 +8,7 @@ from os.path import basename, dirname
 
 import mimetypes
 from PyQt5.QtCore import QThread, pyqtSignal
+from concurrent.futures import ThreadPoolExecutor
 
 import credentials as crd
 
@@ -27,11 +28,12 @@ class MetaDataReader(QThread):
     totalChanged = pyqtSignal(int)
     extractFinished = pyqtSignal(list)
 
-    def __init__(self, dbConnectionPool, path, node_label):
+    def __init__(self, dbConnectionPool, path, node_label, ssd=False):
         QThread.__init__(self)
         self.dbConnectionPool = dbConnectionPool
         self.path = path
         self.node_label = node_label
+        self.ssd = ssd
 
     def run(self):
         audiofiles = []
@@ -64,18 +66,25 @@ class MetaDataReader(QThread):
 
         db = self.dbConnectionPool.getconn()
         cursor = db.cursor()
-        for i in range(len(audiofiles)):
-            # TODO: make this multithreaded
-            audiofiles[i] = self.extract_meta(audiofiles[i])
-            audiofiles[i]['row_id'] = i
-            audiofiles[i]['row_state'] = -1 # -1:no state, 0:OK, 1:error
-            audiofiles[i]['node_label'] = self.node_label
-            audiofiles[i]['comment'] = None
-            audiofiles[i]['duplicate_check'] = self.checkDuplicate(cursor, audiofiles[i])
-            self.countChanged.emit(i+1, audiofiles[i]['original_file_path'])
+        audiofiles_meta = []
+        count = 0
+
+        # random read is very slow on hdd, multithreading is actually worse
+        # making checkDuplicate multithreaded would probably help a bit
+        with ThreadPoolExecutor(os.cpu_count() if self.ssd else 1) as executor:
+            for meta in executor.map(self.extract_meta, audiofiles):
+                meta['node_label'] = self.node_label
+                meta['comment'] = None
+                meta['duplicate_check'] = self.checkDuplicate(cursor, meta) # TODO: inline
+                meta['row_state'] = -1 # for GUI: -1=no state, 0=OK, 1=error
+                meta['row_id'] = count # this is used to identify rows in GUI
+                count += 1
+                audiofiles_meta.append(meta)
+                self.countChanged.emit(count+1, meta['original_file_path'])
+
         cursor.close()
         self.dbConnectionPool.putconn(db)
-        self.extractFinished.emit(audiofiles)
+        self.extractFinished.emit(audiofiles_meta)
 
     def is_valid_id(self, arg):
         result = re.search(r'(^\d{4})[-_](\d{4})$', arg).groups()
