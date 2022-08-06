@@ -24,6 +24,7 @@ rec_nok_str = {
 }
 class MetaDataReader(QThread):
 
+    indexChanged = pyqtSignal(int)
     countChanged = pyqtSignal(int, str)
     totalChanged = pyqtSignal(int)
     extractFinished = pyqtSignal(list)
@@ -38,6 +39,7 @@ class MetaDataReader(QThread):
     def run(self):
         audiofiles = []
         textfiles = []
+        count = 0
         for root, dirs, files in os.walk(os.fspath(self.path)):
             for file in files:
                 filepath = os.path.abspath(os.path.join(root, file))
@@ -54,6 +56,8 @@ class MetaDataReader(QThread):
                         raise Exception('File is zip archive, please unpack first', file, file_type[0])
                     elif file_type[0] == 'audio/x-wav' or file_type[0] == 'audio/wav':
                         audiofiles.append(filepath)
+                        count += 1
+                        self.indexChanged.emit(count)
                     else:
                         raise Exception('File format not compatible', file, file_type[0])
                 except Exception as e:
