@@ -366,6 +366,9 @@ def get_tasks(conn: sqlite3.Connection):
                 conn.execute('update files set state = 1 where file_id = ?', [file_id])
                 conn.commit()
             break
+        except sqlite3.OperationalError:
+            # database is probably locked, try again later
+            time.sleep(1)
         except:
             if VERBOSE: print(traceback.format_exc(), flush=True)
             raise
