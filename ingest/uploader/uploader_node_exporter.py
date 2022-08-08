@@ -17,11 +17,9 @@ class CustomCollector(object):
         yield GaugeMetricFamily('node_fan_state', 'Cooling fan state', value=self.read_fan_state())
         yield GaugeMetricFamily('node_mountpoint_state', 'Disk mountpoint state (1: mounted and readable)', value=self.read_mountpoint_state())
 
-        n = CounterMetricFamily('node_network_stats', 'Network bytes counters (eth0)')
         rx, tx = self.read_network_stats()
-        n.add_metric(['rx_bytes'], rx)
-        n.add_metric(['tx_bytes'], tx)
-        yield n
+        yield CounterMetricFamily('node_rx_bytes', 'received bytes (eth0)', rx)
+        yield CounterMetricFamily('node_tx_bytes', 'transmitted bytes (eth0)', tx)
 
         # fp = CounterMetricFamily('node_img_file_processing', 'File processing state gauges')
         # fp.add_metric(['indexed'], 0)
