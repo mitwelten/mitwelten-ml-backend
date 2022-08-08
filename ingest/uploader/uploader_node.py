@@ -333,14 +333,16 @@ def get_tasks(conn: sqlite3.Connection):
     while True:
         file_id = None
         try:
-            r = conn.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
-            d = {}
-            if r:
-                d = {k: r[i] for (i,k) in enumerate(COLS)}
-                file_id = d['file_id']
+            record_raw = conn.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
+            if record_raw:
+                # transform record_raw to dictionary with colname: value
+                record = {k: record_raw[i] for (i,k) in enumerate(COLS)}
+
+                # mark file as queued
+                file_id = record['file_id']
                 conn.execute('update files set state = 3 where file_id = ?', [file_id])
                 conn.commit()
-                yield d
+                yield record
             else:
                 if VERBOSE: print('sleeping...', end='\r')
                 time.sleep(10)
