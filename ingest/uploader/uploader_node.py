@@ -56,7 +56,7 @@ def is_readable_dir(arg):
         raise ValueError(f'Can\'t read directory/file {arg}')
 
 def is_readable_file(arg):
-    os.stat(f)
+    os.stat(arg)
     with open(arg, 'rb') as f:
         test = f.read1(8)
 
