@@ -1,0 +1,14 @@
+[Unit]
+Description=Mitwelten Image Uploader: Prometheus Monitoring Exporter
+After=network.target
+
+[Service]
+Type=idle
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node_exporter.py
+TimeoutSec=30
+
+[Install]
+WantedBy=default.target
