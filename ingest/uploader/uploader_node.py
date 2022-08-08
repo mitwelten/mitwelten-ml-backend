@@ -55,6 +55,11 @@ def is_readable_dir(arg):
     except Exception as e:
         raise ValueError(f'Can\'t read directory/file {arg}')
 
+def is_readable_file(arg):
+    os.stat(f)
+    with open(arg, 'rb') as f:
+        test = f.read1(8)
+
 def chunks(lst, n):
     '''Yield successive n-sized chunks from lst.'''
     for i in range(0, len(lst), n):
@@ -338,6 +343,13 @@ def get_tasks(conn: sqlite3.Connection):
                 # transform record_raw to dictionary with colname: value
                 record = {k: record_raw[i] for (i,k) in enumerate(COLS)}
 
+                # check if file is readable. if not, wait
+                try:
+                    is_readable_file(record['file_path'])
+                except:
+                    time.sleep(600)
+                    continue
+
                 # mark file as queued
                 file_id = record['file_id']
                 conn.execute('update files set state = 3 where file_id = ?', [file_id])
@@ -512,6 +524,13 @@ def main():
                 for batch, i in chunks(records, BATCHSIZE):
                     if not check_ontime(cfg.meta, args.timed) or not sig_ctrl['run']:
                         break
+
+                    # check if file is readable. if not, skip  to waiting for next iteration
+                    try:
+                        is_readable_file(batch[0][1])
+                    except:
+                        break
+
                     print(f'processing batch {1 + (i // BATCHSIZE)} of {1 + (len(records) // BATCHSIZE)} ({BATCHSIZE} items)')
                     metalist = []
                     # Using ProcessPool instread of ThreadPool saves a few seconds
