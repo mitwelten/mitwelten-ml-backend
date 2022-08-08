@@ -17,6 +17,12 @@ class CustomCollector(object):
         yield GaugeMetricFamily('node_fan_state', 'Cooling fan state', value=self.read_fan_state())
         yield GaugeMetricFamily('node_mountpoint_state', 'Disk mountpoint state (1: mounted and readable)', value=self.read_mountpoint_state())
 
+        n = CounterMetricFamily('node_network_stats', 'Network bytes counters (eth0)')
+        rx, tx = self.read_network_stats()
+        n.add_metric(['rx_bytes'], rx)
+        n.add_metric(['tx_bytes'], tx)
+        yield n
+
         # fp = CounterMetricFamily('node_img_file_processing', 'File processing state gauges')
         # fp.add_metric(['indexed'], 0)
         # fp.add_metric(['error', 'corrupted'], 0)
@@ -64,6 +70,12 @@ class CustomCollector(object):
             return 1
         # finally:
         #     return states
+
+    def read_network_stats(self): # -> tuple(int, int):
+        '''Read bytes counters'''
+        with open('/sys/class/net/eth0/statistics/rx_bytes', 'r') as rx, \
+             open('/sys/class/net/eth0/statistics/tx_bytes', 'r') as tx:
+            return (int(rx.read()), int(tx.read()))
 
 REGISTRY.register(CustomCollector())
 
