@@ -48,7 +48,7 @@ def is_readable_dir(arg):
     try:
         if os.path.isfile(arg):
             arg = os.path.dirname(arg)
-        if os.path.isdir(arg) and os.access(arg, os.R_OK):
+        if os.path.isdir(arg) and os.access(arg, os.R_OK) and os.listdir(arg):
             return arg
         else:
             raise f'{arg}: Directory not accessible'
