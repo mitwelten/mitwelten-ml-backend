@@ -356,6 +356,13 @@ def get_tasks(conn: sqlite3.Connection):
             if VERBOSE: print(traceback.format_exc(), flush=True)
             raise
 
+def check_mountpoint(mp: str):
+    if not (os.path.isdir(mp)
+        and os.access(mp, os.R_OK)
+        and os.path.ismount(mp)
+        and os.listdir(mp)):
+        raise EnvironmentError(f'Failed to read from mountpoint {mp}')
+
 def check_ontime(cfg: cfg.NodeUploaderConfig, timed: bool) -> bool:
     'If current time is in period or no timing is specified run'
     if timed:
@@ -448,8 +455,13 @@ def main():
         # TODO: make ShutdownRequestException work (use a different handler)
         signal.signal(signal.SIGTERM, sigterm_handler)
 
+        # check if directory is mountpoint on invocation
+        is_mountpoint = os.path.ismount(args.index)
+
         while True:
             try:
+                # if mountpoint, check if still ok, if not throw exception and don't update checkpoint
+                if is_mountpoint: check_mountpoint(args.index)
                 print('indexing')
                 checkpoint = c.execute('''select time_out from checkpoints where type = 'index' ''').fetchone()
                 checkpoint = 0 if checkpoint == None else checkpoint[0]
