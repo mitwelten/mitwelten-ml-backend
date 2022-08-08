@@ -40,15 +40,18 @@ mkdir -p $HOME/.config/systemd/user
 ln -s $UPLOADERDIR/services/mitwelten-img-indexer.service $HOME/.config/systemd/user/
 ln -s $UPLOADERDIR/services/mitwelten-img-metadata.service $HOME/.config/systemd/user/
 ln -s $UPLOADERDIR/services/mitwelten-img-uploader.service $HOME/.config/systemd/user/
+ln -s $UPLOADERDIR/services/mitwelten-exporter.service $HOME/.config/systemd/user/
 
 # enable the units
 systemctl --user daemon-reload
 systemctl --user enable mitwelten-img-indexer.service
 systemctl --user enable mitwelten-img-metadata.service
 systemctl --user enable mitwelten-img-uploader.service
+systemctl --user enable mitwelten-exporter.service
 
 # start the units
 systemctl --user start mitwelten-img-indexer.service
 systemctl --user start mitwelten-img-metadata.service
 systemctl --user start mitwelten-img-uploader.service
+systemctl --user start mitwelten-exporter.service
 ```
