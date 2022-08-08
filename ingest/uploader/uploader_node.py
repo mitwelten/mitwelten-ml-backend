@@ -345,7 +345,7 @@ def get_tasks(conn: sqlite3.Connection):
 
                 # check if file is readable. if not, wait
                 try:
-                    is_readable_file(record['file_path'])
+                    is_readable_file(record['path'])
                 except:
                     time.sleep(600)
                     continue
