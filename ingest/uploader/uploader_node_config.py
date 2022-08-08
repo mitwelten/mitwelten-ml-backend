@@ -21,7 +21,7 @@ class IndexConfig(NodeUploaderConfig):
 
 class MetaConfig(NodeUploaderConfig):
 
-    threads = 2
+    threads = 1
     'Number of threads to spawn'
 
 class UploadConfig(NodeUploaderConfig):
