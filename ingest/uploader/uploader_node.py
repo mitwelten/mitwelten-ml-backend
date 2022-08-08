@@ -317,6 +317,7 @@ def worker(queue: Queue):
         except Exception as e:
             # -4: file upload error
             print('File upload error', str(e))
+            print(traceback.format_exc())
             cur.execute('''
             update files set (state, file_uploaded_at) = (-4, strftime('%s'))
             where file_id = ?
