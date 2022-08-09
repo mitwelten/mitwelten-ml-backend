@@ -314,6 +314,15 @@ def worker(queue: Queue):
             conn.commit()
             cur.close()
 
+        except requests.exceptions.ConnectionError:
+            print('Connecting Error:', str(e))
+            # mark checked (ready for upload)
+            store_task_state(conn, record['file_id'], 1)
+            queue.task_done()
+            # wait 10sec before trying on the next task
+            time.sleep(10)
+            continue
+
         except Exception as e:
             # -4: file upload error
             print('File upload error', str(e))
