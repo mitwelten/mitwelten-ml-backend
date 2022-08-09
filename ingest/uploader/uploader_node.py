@@ -228,7 +228,7 @@ def worker(queue: Queue):
             validation = r.json()
 
             if r.status_code != 200:
-                raise Exception(f"failed to insert metadata for {d['path']}: {validation['detail']}")
+                raise Exception(f"failed to validate metadata for {d['path']}: {validation['detail']}")
 
             if validation['hash_match'] or validation['object_name_match']:
                 cur.execute('update files set state = -3 where file_id = ?', [d['file_id']])
