@@ -199,7 +199,7 @@ def worker(queue: Queue):
             storage = connect_s3()
         except Exception as e:
             print('Connecting to S3 bucket failed:', str(e))
-            # mark paused
+            # mark checked (ready for upload)
             store_task_state(conn, record['file_id'], 1)
             queue.task_done()
             # wait 10min before running into the same problem with the next task
@@ -212,7 +212,7 @@ def worker(queue: Queue):
             api = connect_api()
         except Exception as e:
             print('Connecting to REST backend failed:', str(e))
-            # mark paused
+            # mark checked (ready for upload)
             store_task_state(conn, record['file_id'], 1)
             queue.task_done()
             # wait 10min before running into the same problem with the next task
