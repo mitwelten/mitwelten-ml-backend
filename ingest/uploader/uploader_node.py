@@ -273,8 +273,8 @@ def worker(queue: Queue):
                 json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id',
                     'location_id', 'timestamp', 'file_size', 'resolution')})
 
-            if r.status_code != 200:
-                raise MetadataInsertException(f"failed to insert metadata for {d['path']}: {r.json()['detail']}")
+            # this should be caught as MetadataInsertException for distinct status
+            r.raise_for_status()
 
             # store metadata status
             cur.execute('''
@@ -325,7 +325,7 @@ def worker(queue: Queue):
 
         except Exception as e:
             # -4: file upload error
-            print('File upload error', str(e))
+            print('File upload error:', d['path'], str(e))
             print(traceback.format_exc())
             cur.execute('''
             update files set (state, file_uploaded_at) = (-4, strftime('%s'))
