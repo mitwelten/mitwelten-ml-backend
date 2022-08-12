@@ -1,5 +1,5 @@
 [Unit]
-Description=Mitwelten Image Uploader: Prometheus Monitoring Exporter
+Description=Mitwelten Camera Access Point: Prometheus Monitoring Exporter
 After=network.target
 
 [Service]
