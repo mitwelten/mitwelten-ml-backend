@@ -79,7 +79,7 @@ def main():
 
     while True:
 
-        records = database.execute('select id, url, enabled, status from cameras').fetchall()
+        records = database.execute('select id, url, enabled, status_code from cameras').fetchall()
         targets = [{'name': r[0], 'url': r[1], 'enabled': r[2], 'status': r[3]} for r in records]
         metrics = asyncio.run(test_http_targets(targets, args.http_timeout))
         for m in metrics:
