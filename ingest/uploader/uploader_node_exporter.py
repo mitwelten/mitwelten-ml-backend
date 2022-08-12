@@ -68,9 +68,6 @@ def main():
         raise Exception(f'Can\'t write to file {args.metrics_path}')
 
     database = sqlite3.connect(args.config_db)
-    c = database.cursor()
-    records = c.execute('select id, url, enabled from cameras').fetchall()
-    targets = [{'name': r[0], 'url': r[1], 'enabled': r[2]} for r in records]
 
     registry = CollectorRegistry()
     collectors = {
@@ -82,11 +79,13 @@ def main():
 
     while True:
 
+        records = database.execute('select id, url, enabled, status from cameras').fetchall()
+        targets = [{'name': r[0], 'url': r[1], 'enabled': r[2], 'status': r[3]} for r in records]
         metrics = asyncio.run(test_http_targets(targets, args.http_timeout))
         for m in metrics:
             if m['status'] != None:
                 collectors['cam_response_latency'].labels(m['target']['name']).set(m['elapsed'])
-                collectors['cam_response_code'].labels(m['target']['name']).set(m['status'])
+                collectors['cam_response_code'].labels(m['target']['name']).set(m['target']['status'])
                 collectors['cam_reachable'].labels(m['target']['name']).set(1)
             else:
                 collectors['cam_reachable'].labels(m['target']['name']).set(0)
