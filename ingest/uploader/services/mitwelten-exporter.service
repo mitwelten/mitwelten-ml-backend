@@ -7,7 +7,9 @@ Type=idle
 Restart=on-failure
 RestartSec=5
 WorkingDirectory=/home/pi/mitwelten-ml-backend/ingest/uploader/
-ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node_exporter.py
+ExecStart=/home/pi/mitwelten-ml-backend/ingest/uploader/.venv/bin/python -u uploader_node_exporter.py \
+  --config-db /home/pi/config/camera_info.db \
+  --metrics-path /home/pi/monitoring/cam-node-metric.prom
 TimeoutSec=30
 
 [Install]

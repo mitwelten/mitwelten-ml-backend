@@ -5,6 +5,8 @@
 ### Setup venv and install dependencies
 
 ```bash
+sudo apt install prometheus-node-exporter
+
 UPLOADERDIR="$HOME/mitwelten-ml-backend/ingest/uploader"
 
 cd $UPLOADERDIR
@@ -27,6 +29,10 @@ All units:
 
 - `ExecStart`: The option `--index` with absolute path to __root capture directory__
 
+`mitwelten-exporter.service`:
+
+- make sure the `--metrics-path` exists and is writable (`mkdir ~/monitoring`)
+
 ### Install and start system units
 
 ```bash
@@ -43,6 +49,7 @@ ln -s $UPLOADERDIR/services/mitwelten-img-uploader.service $HOME/.config/systemd
 ln -s $UPLOADERDIR/services/mitwelten-exporter.service $HOME/.config/systemd/user/
 
 # enable the units
+sudo systemctl enable prometheus-node-exporter.service
 systemctl --user daemon-reload
 systemctl --user enable mitwelten-img-indexer.service
 systemctl --user enable mitwelten-img-metadata.service
@@ -50,8 +57,15 @@ systemctl --user enable mitwelten-img-uploader.service
 systemctl --user enable mitwelten-exporter.service
 
 # start the units
+sudo systemctl start prometheus-node-exporter.service
 systemctl --user start mitwelten-img-indexer.service
 systemctl --user start mitwelten-img-metadata.service
 systemctl --user start mitwelten-img-uploader.service
 systemctl --user start mitwelten-exporter.service
 ```
+
+## Monitoring
+
+`mitwelten-exporter` depends on `prometheus-node-exporter` to read and expose the metrics to the prometheus server.
+In order to read metrics from `prometheus-node-exporter`, the corresponding port needs to be accessible, which
+requires a yaler tunnel.
