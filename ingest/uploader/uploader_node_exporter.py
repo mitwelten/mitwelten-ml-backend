@@ -62,13 +62,10 @@ def main():
     args = parser.parse_args()
 
     # check if output can be written
-    path = args.metrics_path
-    if os.path.isfile(path):
-        path = os.path.dirname(path)
-    if os.path.isdir(path) and os.access(path, os.W_OK):
+    if os.access(os.path.dirname(args.metrics_path), os.W_OK):
         open(args.metrics_path, 'a').close()
     else:
-        raise f'Can\'t write to file {args.metrics_path}'
+        raise Exception(f'Can\'t write to file {args.metrics_path}')
 
     database = sqlite3.connect(args.config_db)
     c = database.cursor()
@@ -96,7 +93,7 @@ def main():
 
         collectors['node_mountpoint_state'].set(get_mountpoint_state())
 
-        write_to_textfile('./metrics.prom', registry)
+        write_to_textfile(args.metrics_path, registry)
         time.sleep(5)
 
 if __name__ == '__main__':
