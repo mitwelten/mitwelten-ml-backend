@@ -32,6 +32,12 @@ All units:
 `mitwelten-exporter.service`:
 
 - make sure the `--metrics-path` exists and is writable (`mkdir ~/monitoring`)
+- configure `prometheus-node-exporter` with the corresponing path and port number (`xxxx`):
+
+```bash
+echo 'ARGS="--web.listen-address=\":xxxx\" --collector.textfile.directory=\"/home/pi/monitoring/\""' \
+  | sudo tee --append /etc/default/prometheus-node-exporter
+```
 
 ### Install and start system units
 
@@ -67,5 +73,5 @@ systemctl --user start mitwelten-exporter.service
 ## Monitoring
 
 `mitwelten-exporter` depends on `prometheus-node-exporter` to read and expose the metrics to the prometheus server.
-In order to read metrics from `prometheus-node-exporter`, the corresponding port needs to be accessible, which
-requires a yaler tunnel.
+In order to read metrics from `prometheus-node-exporter`, the corresponding port (see above) needs to be accessible,
+which requires a yaler tunnel.
