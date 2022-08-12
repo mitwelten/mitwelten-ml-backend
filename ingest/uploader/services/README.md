@@ -2,10 +2,24 @@
 
 ## Installation
 
-### Setup venv and install dependencies
+### Install dependencies
 
 ```bash
-sudo apt install prometheus-node-exporter
+# (un)install prometheus and dependencies
+sudo apt update -y
+sudo apt install -y prometheus-node-exporter
+sudo systemctl stop exim4.service
+sudo systemctl disable exim4.service
+sudo systemctl stop smartd.service
+sudo systemctl disable smartd.service
+sudo systemctl stop prometheus-node-exporter-smartmon.timer
+sudo systemctl disable prometheus-node-exporter-smartmon.timer
+sudo systemctl stop prometheus-node-exporter-apt.timer
+sudo systemctl disable prometheus-node-exporter-apt.timer
+sudo systemctl stop prometheus-node-exporter-ipmitool-sensor.timer
+sudo systemctl disable prometheus-node-exporter-ipmitool-sensor.timer
+sudo systemctl stop prometheus-node-exporter-mellanox-hca-temp.timer
+sudo systemctl disable prometheus-node-exporter-mellanox-hca-temp.timer
 
 UPLOADERDIR="$HOME/mitwelten-ml-backend/ingest/uploader"
 
@@ -16,7 +30,7 @@ pip install -U pip
 pip install -r requirements-uploader-node.txt
 ```
 
-### Check paths
+### Check paths / configuration
 
 Check if the paths are correctly setup in the system units.
 
@@ -35,7 +49,7 @@ All units:
 - configure `prometheus-node-exporter` with the corresponing path and port number (`xxxx`):
 
 ```bash
-echo 'ARGS="--web.listen-address=\":xxxx\" --collector.textfile.directory=\"/home/pi/monitoring/\""' \
+echo 'ARGS="--web.listen-address=\":9958\" --collector.textfile.directory=\"/home/pi/monitoring/\""' \
   | sudo tee --append /etc/default/prometheus-node-exporter
 ```
 
