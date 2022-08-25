@@ -129,6 +129,9 @@ class Runner(object):
                     time.sleep(10)
             except KeyboardInterrupt:
                 break
+            except GeneratorExit:
+                print('stopping task generator', flush=True)
+                break
             except:
                 print(traceback.format_exc(), flush=True)
                 break
