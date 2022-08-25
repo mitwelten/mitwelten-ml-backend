@@ -217,7 +217,11 @@ def worker(queue, localcfg):
             # at this point some results may have been written to db,
             # those also may have already been deleted
             cursor.execute(finish_query, (3, task[0],))
-            connection.commit()
+            break
+        except errors.OperationalError as e:
+            print(f'task {task[0]} failed ({str(e)}), retrying.', flush=True)
+            connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
+            connection.cursor().execute(finish_query, (0, task[0],))
             break
         except:
             print(f'task {task[0]} failed')
