@@ -527,7 +527,7 @@ def main():
         while True: # This could be handled in the system unit, restart after exit, with delay
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
-                time.sleep(600)
+                if args.timed: time.sleep(600)
                 if not check_ontime(cfg.meta, args.timed):
                     continue
 
@@ -573,7 +573,7 @@ def main():
                             where file_id = ?
                             ''', [meta['file_size'], meta['node_label'], meta['timestamp'], meta['resolution'][0], meta['resolution'][1], meta['file_id']])
                     database.commit()
-
+                if not args.timed: break
             except ShutdownRequestException or KeyboardInterrupt:
                 break
             except Exception as e:
