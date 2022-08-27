@@ -685,6 +685,7 @@ def main():
 
         if records != None:
             try:
+                os.makedirs(target_dir, exist_ok=True)
                 for file_id, path in records:
                     if VERBOSE: print(f'moving ({file_id}) {path} to {target_dir}')
                     shutil.move(path, os.path.join(target_dir,os.path.basename(path)))
