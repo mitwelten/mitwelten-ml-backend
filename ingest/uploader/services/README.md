@@ -46,9 +46,10 @@ All units:
 `mitwelten-exporter.service`:
 
 - make sure the `--metrics-path` exists and is writable (`mkdir ~/monitoring`)
-- configure `prometheus-node-exporter` with the corresponing path and port number (`xxxx`):
+- configure `prometheus-node-exporter` with the corresponing path and port number:
 
 ```bash
+mkdir $HOME/monitoring
 echo 'ARGS="--web.listen-address=\":9958\" --collector.textfile.directory=\"/home/pi/monitoring/\""' \
   | sudo tee --append /etc/default/prometheus-node-exporter
 ```
