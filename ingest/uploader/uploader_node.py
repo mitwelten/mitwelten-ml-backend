@@ -240,9 +240,8 @@ def worker(queue: Queue):
                 raise Exception('node is/was not deployed at requested time:', d['node_label'], d['timestamp'].isoformat())
             else:
                 if VERBOSE: print('new file:', validation['object_name'])
-                d['object_name'] = validation['object_name']
-                d['node_id']     = validation['node_id']
-                d['location_id'] = validation['location_id']
+                d['object_name']   = validation['object_name']
+                d['deployment_id'] = validation['deployment_id']
 
         except Exception as e:
             print('Validation failed:', str(e))
@@ -270,8 +269,8 @@ def worker(queue: Queue):
             # store metadata in postgres
             d['resolution'] = (d['resolution_x'], d['resolution_y'])
             r = api.post(f'{APIURL}/ingest/image',
-                json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id',
-                    'location_id', 'timestamp', 'file_size', 'resolution')})
+                json={ k: d[k] for k in ('object_name', 'sha256', 'deployment_id',
+                    'timestamp', 'file_size', 'resolution')})
 
             # this should be caught as MetadataInsertException for distinct status
             r.raise_for_status()
