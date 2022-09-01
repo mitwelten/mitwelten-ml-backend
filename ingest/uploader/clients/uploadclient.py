@@ -45,7 +45,6 @@ class UploadClient(QThread):
             file_id  = None
             object_name  = None
             # 3. upload
-            etag = None
             # 4. confirm in db
 
             try:
@@ -125,6 +124,7 @@ class UploadClient(QThread):
                 # logger.error(f"error occurred for file_id: {file_id}: {exc}")
                 db.rollback()
                 self.dbConnectionPool.putconn(db)
+                return item['row_id'], file_id, None
 
             try:
                 metadata = { 'file_id': file_id }
