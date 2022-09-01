@@ -127,7 +127,7 @@ def image_upload_worker(file):
         except:
             logger.error(traceback.format_exc())
             logger.error('failed uploading: deleting record from db')
-            query = 'DELETE FROM {}.files_image WHERE file_id = %s'.format(crd.db.schema)
+            query = 'DELETE FROM {schema}.files_image WHERE file_id = %s'.format(schema=crd.db.schema)
             cursor.execute(query, (file_id,))
             db.commit()
         else:
@@ -205,9 +205,9 @@ def check_image_duplicates(imagefiles):
     )
     SELECT f.sha256 = n.sha256 as hash_match,
         f.object_name = n.object_name as object_name_match
-    from {}.files_image f, n
+    from {schema}.files_image f, n
     where (f.sha256 = n.sha256 or f.object_name = n.object_name)
-    '''.format(crd.db.schema)
+    '''.format(schema=crd.db.schema)
     upload_list = []
     progress = tqdm(total=len(imagefiles))
     for file in imagefiles.values():
@@ -247,7 +247,7 @@ def update_nodes(imagefiles, node_type):
     records = [(node_label, node_type) for node_label in node_labels]
     db = dbConnectionPool.getconn()
     cursor = db.cursor()
-    query = 'INSERT INTO {}.nodes(node_label, type) VALUES %s ON CONFLICT DO NOTHING'.format(crd.db.schema)
+    query = 'INSERT INTO {schema}.nodes(node_label, type) VALUES %s ON CONFLICT DO NOTHING'.format(schema=crd.db.schema)
     print(f'found {len(node_labels)} node labels:', ','.join([n for n in node_labels.keys()]))
     execute_values(cursor, query, records)
     db.commit()

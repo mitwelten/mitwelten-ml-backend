@@ -52,7 +52,7 @@ class UploadClient(QThread):
                 # TODO: add created_at, updated_at
                 # TODO: add coordinates
                 query = '''
-                INSERT INTO {}.files_audio (
+                INSERT INTO {schema}.files_audio (
                     object_name,
                     sha256,
                     time,
@@ -83,7 +83,7 @@ class UploadClient(QThread):
                     %s, -- sample_rate
                     %s, -- bit_depth
                     %s, -- channels
-                    (SELECT node_id from {}.nodes WHERE node_label = %s), -- node_id
+                    (SELECT node_id from {schema}.nodes WHERE node_label = %s), -- node_id
                     %s, -- serial_number
                     %s, -- battery
                     %s, -- temperature
@@ -96,7 +96,7 @@ class UploadClient(QThread):
                     CURRENT_TIMESTAMP, -- created_at
                     CURRENT_TIMESTAMP) -- updated_at
                 RETURNING file_id, object_name
-                '''.format(crd.db.schema, crd.db.schema)
+                '''.format(schema=crd.db.schema)
 
                 cursor.execute(query, (
                     item['node_label'], item['time_start'],
@@ -141,14 +141,14 @@ class UploadClient(QThread):
                 result = storage.fput_object(crd.minio.bucket, object_name, source,
                     content_type='audio/x-wav', metadata=metadata, tags=tags)
                 # set upload timestamp
-                query = 'UPDATE {}.files_audio SET updated_at = CURRENT_TIMESTAMP WHERE file_id = %s'.format(crd.db.schema)
+                query = 'UPDATE {schema}.files_audio SET updated_at = CURRENT_TIMESTAMP WHERE file_id = %s'.format(schema=crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
                 # report
                 # logger.info(f'created {result.object_name}; file_id: {file_id}, etag: {result.etag}')
             except Exception as exc:
                 # delete record from db
-                query = 'DELETE FROM {}.files_audio WHERE file_id = %s'.format(crd.db.schema)
+                query = 'DELETE FROM {schema}.files_audio WHERE file_id = %s'.format(schema=crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
                 # report
