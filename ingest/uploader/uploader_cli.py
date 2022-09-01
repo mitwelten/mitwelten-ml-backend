@@ -115,7 +115,10 @@ def image_upload_worker(file):
         ))
         result = cursor.fetchone()
         file_id, object_name = result
-    except:
+    except Exception as e:
+        if isinstance(e, pg.Error):
+            print(f"DB error for file {file['path']}: {e.diag.message_primary}",
+                f"{'-> node deployement missing.' if e.diag.column_name == 'deployment_id' else None}")
         logger.error(traceback.format_exc())
         logger.error('rolling back transaction')
         db.rollback()
@@ -236,23 +239,31 @@ def check_image_duplicates(imagefiles):
     print(f'found {len(upload_list)} image files that don\'t exist in db/storage')
     return upload_list
 
-def update_nodes(imagefiles, node_type):
-    node_labels = {}
-    for file in imagefiles:
-        if file['node_label'] in node_labels:
-            node_labels[file['node_label']] += 1
+def check_deployed(imagefiles: dict):
+    timestamps_by_node_label = {}
+    for file in sorted(imagefiles.values(), key=lambda x: x['timestamp']):
+        if file['node_label'] in timestamps_by_node_label:
+            timestamps_by_node_label[file['node_label']].append(file['timestamp'])
         else:
-            node_labels[file['node_label']] = 1
-
-    records = [(node_label, node_type) for node_label in node_labels]
+            timestamps_by_node_label[file['node_label']] = [file['timestamp']]
     db = dbConnectionPool.getconn()
     cursor = db.cursor()
-    query = 'INSERT INTO {schema}.nodes(node_label, type) VALUES %s ON CONFLICT DO NOTHING'.format(schema=crd.db.schema)
-    print(f'found {len(node_labels)} node labels:', ','.join([n for n in node_labels.keys()]))
-    execute_values(cursor, query, records)
-    db.commit()
+    query = 'SELECT deployment_id, period FROM {schema}.deployments WHERE node_id = (SELECT node_id FROM {schema}.nodes WHERE node_label = %s) AND %s::timestamptz <@ period'.format(schema=crd.db.schema)
+    deployment_issues = []
+    for node_label in timestamps_by_node_label.keys():
+        check = []
+        for i in (0, -1):
+            cursor.execute(query, (node_label, timestamps_by_node_label[node_label][i]))
+            result = cursor.fetchone()
+            if result == None: check.append(timestamps_by_node_label[node_label][i].isoformat())
+        if len(check) == 1:
+            deployment_issues.append(f'Node {node_label} is only partially covered by a deployment, please update to cover {check[0]}.')
+        if len(check) == 2:
+            deployment_issues.append(f'Node {node_label} is not covered by a deployment, please update or add a one to cover from {check[0]} to {check[1]}.')
     cursor.close()
     dbConnectionPool.putconn(db)
+    if len(deployment_issues) > 0:
+        raise Exception('Errors occured when checking nodes for matching deployments:\n' + '\n'.join(deployment_issues))
 
 def is_readable_dir(arg):
     try:
@@ -323,11 +334,17 @@ def main():
         # get image metadata and filter duplicates
         batch = extract_image_meta(batch)
 
+        # check if node deployed at min/max timestamp of batch
+        try:
+            check_deployed(batch)
+        except Exception as e:
+            logger.error(e)
+            print(e)
+            break
+
         # check image duplicates in DB
         # duplicate check and upload is seperate to preemtivly checking for errors
         batch = check_image_duplicates(batch)
-
-        update_nodes(batch, 'cam')
 
         # upload files
         if len(batch) > 0:
