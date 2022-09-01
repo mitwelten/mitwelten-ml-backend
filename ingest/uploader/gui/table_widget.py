@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
 
 import re
 from time import time
+from datetime import timedelta
 import psycopg2 as pg
 from psycopg2 import pool
 
@@ -211,7 +212,7 @@ class Widget(QWidget):
         node_labels = []
         for n in nodes:
             start = '-inf' if n[0].lower == None else n[0].lower.strftime('%Y-%m-%d')
-            end = 'inf' if n[0].upper == None else n[0].upper.strftime('%Y-%m-%d')
+            end = 'inf' if n[0].upper == None else (n[0].upper - timedelta(seconds=1)).strftime('%Y-%m-%d')
             node_labels.append(f'{n[2]} ({start} - {end})')
         return node_labels
 
