@@ -213,7 +213,7 @@ class Widget(QWidget):
 
     def connectDb(self):
         if self.dbPool == None:
-            self.statusLabel.setText(f'Connecting to database server')
+            self.statusLabel.setText(f'Connecting to database server...')
             credentials = {
                 'host':crd.db.host,
                 'port':crd.db.port,
@@ -228,6 +228,7 @@ class Widget(QWidget):
                 self.statusLabel.setText(f'Unable to connect to database server. Are you connected to the FHNW network?')
                 return False
             else:
+                self.statusLabel.setText(f'Connected to database server.')
                 self.dbPool = pool.ThreadedConnectionPool(5, 10, **credentials)
                 return True
         else:
