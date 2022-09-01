@@ -123,7 +123,8 @@ class UploadClient(QThread):
             except Exception as e:
                 print('Error occurred while inserting record for file {}: {}'.format(item['original_file_path'],e))
                 # logger.error(f"error occurred for file_id: {file_id}: {exc}")
-                return item['row_id'], file_id, etag
+                db.rollback()
+                self.dbConnectionPool.putconn(db)
 
             try:
                 metadata = { 'file_id': file_id }
