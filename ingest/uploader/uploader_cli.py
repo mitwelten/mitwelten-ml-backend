@@ -91,7 +91,7 @@ def image_upload_worker(file):
         || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s, -- file_name (node_label, timestamp, extension)
         %s, -- sha256
         %s, -- time
-        (SELECT deployment_id from {schema}.deployments WHERE node_id = (SELECT node_id from {schema}.nodes WHERE node_label = %s) and %s::timestamptz <@ period), -- deployment_id
+        (SELECT deployment_id from {schema}.deployments WHERE node_id = (SELECT node_id from {schema}.nodes WHERE node_label = %s) and (%s at time zone 'UTC')::timestamptz <@ period), -- deployment_id
         %s, -- file_size
         %s, -- resolution
         CURRENT_TIMESTAMP, -- created_at
