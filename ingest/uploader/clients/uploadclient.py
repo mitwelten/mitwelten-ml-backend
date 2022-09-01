@@ -49,8 +49,6 @@ class UploadClient(QThread):
             # 4. confirm in db
 
             try:
-                # TODO: add created_at, updated_at
-                # TODO: add coordinates
                 query = '''
                 INSERT INTO {schema}.files_audio (
                     object_name,
@@ -61,7 +59,7 @@ class UploadClient(QThread):
                     sample_rate,
                     bit_depth,
                     channels,
-                    node_id,
+                    deployment_id,
                     serial_number,
                     battery,
                     temperature,
@@ -83,7 +81,7 @@ class UploadClient(QThread):
                     %s, -- sample_rate
                     %s, -- bit_depth
                     %s, -- channels
-                    (SELECT node_id from {schema}.nodes WHERE node_label = %s), -- node_id
+                    (SELECT deployment_id from {schema}.deployments where node_id = (SELECT node_id from {schema}.nodes WHERE node_label = %s) and (%s at time zone 'UTC')::timestamptz <@ period), -- deployment_id
                     %s, -- serial_number
                     %s, -- battery
                     %s, -- temperature
@@ -109,6 +107,7 @@ class UploadClient(QThread):
                     item['bit_depth'],
                     item['channels'],
                     item['node_label'],
+                    item['time_start'],
                     item['serial_number'],
                     item['battery'],
                     item['temperature'],
