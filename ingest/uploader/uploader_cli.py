@@ -77,14 +77,13 @@ def image_upload_worker(file):
     tags = Tags(for_object=True)
     tags['node_label'] = str(file['node_label'])
     query = '''
-    INSERT INTO {}.files_image (
+    INSERT INTO {schema}.files_image (
         object_name,
         sha256,
         time,
-        node_id,
+        deployment_id,
         file_size,
         resolution,
-        location_id,
         created_at,
         updated_at)
     VALUES (
@@ -92,15 +91,14 @@ def image_upload_worker(file):
         || %s||'_'||to_char(%s at time zone 'UTC', 'YYYY-mm-DD"T"HH24-MI-SS"Z"')||%s, -- file_name (node_label, timestamp, extension)
         %s, -- sha256
         %s, -- time
-        (SELECT node_id from {}.nodes WHERE node_label = %s), -- node_id
+        (SELECT deployment_id from {schema}.deployments WHERE node_id = (SELECT node_id from {schema}.nodes WHERE node_label = %s) and %s::timestamptz <@ period), -- deployment_id
         %s, -- file_size
         %s, -- resolution
-        %s, -- location_id
         CURRENT_TIMESTAMP, -- created_at
         CURRENT_TIMESTAMP) -- updated_at
     ON CONFLICT DO NOTHING
     RETURNING file_id, object_name
-    '''.format(crd.db.schema, crd.db.schema)
+    '''.format(schema=crd.db.schema)
     try:
         cursor.execute(query, (
             file['node_label'],
@@ -111,9 +109,9 @@ def image_upload_worker(file):
             file['sha256'],
             file['timestamp'],
             file['node_label'],
+            file['timestamp'],
             file['file_size'],
             [int(px) for px in file['resolution']],
-            None
         ))
         result = cursor.fetchone()
         file_id, object_name = result
