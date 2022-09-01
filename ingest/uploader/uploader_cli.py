@@ -118,7 +118,7 @@ def image_upload_worker(file):
     except Exception as e:
         if isinstance(e, pg.Error):
             print(f"DB error for file {file['path']}: {e.diag.message_primary}",
-                f"{'-> node deployement missing.' if e.diag.column_name == 'deployment_id' else None}")
+                f"{'-> node deployment missing.' if e.diag.column_name == 'deployment_id' else None}")
         logger.error(traceback.format_exc())
         logger.error('rolling back transaction')
         db.rollback()
