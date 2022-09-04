@@ -525,15 +525,16 @@ def main():
         while True: # This could be handled in the system unit, restart after exit, with delay
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
-                if args.timed: time.sleep(600)
-                if not check_ontime(cfg.meta, args.timed):
-                    continue
+                if args.timed:
+                    time.sleep(600)
+                    if not check_ontime(cfg.meta, args.timed):
+                        continue
 
                 print('extracting metadata, checking for file corruption')
                 records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
                 for batch, i in chunks(records, BATCHSIZE):
-                    if not check_ontime(cfg.meta, args.timed) or not sig_ctrl['run']:
+                    if (args.timed and not check_ontime(cfg.meta, args.timed)) or not sig_ctrl['run']:
                         break
 
                     # check if file is readable. if not, skip to waiting for next iteration
