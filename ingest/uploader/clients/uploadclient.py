@@ -13,7 +13,7 @@ import credentials as crd
 
 class UploadClient(QThread):
 
-    countChanged = pyqtSignal(int, int, int, str)
+    countChanged = pyqtSignal(int, int, str)
     uploadFinished = pyqtSignal(int)
 
     def __init__(self, dbConnectionPool, fileset):
@@ -45,14 +45,12 @@ class UploadClient(QThread):
             file_id  = None
             object_name  = None
             # 3. upload
-            etag = None
+            error = None
             # 4. confirm in db
 
             try:
-                # TODO: add created_at, updated_at
-                # TODO: add coordinates
                 query = '''
-                INSERT INTO {}.files_audio (
+                INSERT INTO {schema}.files_audio (
                     object_name,
                     sha256,
                     time,
@@ -61,7 +59,7 @@ class UploadClient(QThread):
                     sample_rate,
                     bit_depth,
                     channels,
-                    node_id,
+                    deployment_id,
                     serial_number,
                     battery,
                     temperature,
@@ -83,7 +81,7 @@ class UploadClient(QThread):
                     %s, -- sample_rate
                     %s, -- bit_depth
                     %s, -- channels
-                    (SELECT node_id from {}.nodes WHERE node_label = %s), -- node_id
+                    (SELECT deployment_id from {schema}.deployments where node_id = (SELECT node_id from {schema}.nodes WHERE node_label = %s) and (%s at time zone 'UTC')::timestamptz <@ period), -- deployment_id
                     %s, -- serial_number
                     %s, -- battery
                     %s, -- temperature
@@ -96,7 +94,7 @@ class UploadClient(QThread):
                     CURRENT_TIMESTAMP, -- created_at
                     CURRENT_TIMESTAMP) -- updated_at
                 RETURNING file_id, object_name
-                '''.format(crd.db.schema, crd.db.schema)
+                '''.format(schema=crd.db.schema)
 
                 cursor.execute(query, (
                     item['node_label'], item['time_start'],
@@ -109,6 +107,7 @@ class UploadClient(QThread):
                     item['bit_depth'],
                     item['channels'],
                     item['node_label'],
+                    item['time_start'],
                     item['serial_number'],
                     item['battery'],
                     item['temperature'],
@@ -122,9 +121,19 @@ class UploadClient(QThread):
                 db.commit()
                 file_id, object_name = cursor.fetchone()
             except Exception as e:
-                print('Error occurred while inserting record for file {}: {}'.format(item['original_file_path'],e))
+                error = 'database error'
+                msg = 'Error occurred while inserting record for file {}: {}'
+                if isinstance(e, pg.Error):
+                    if e.diag.column_name == 'deployment_id':
+                        msg += ' -> node deployment missing.'
+                        error = 'deployment missing'
+                    print(msg.format(item['original_file_path'], e.diag.message_primary))
+                else:
+                    print(msg.format(item['original_file_path'], e))
                 # logger.error(f"error occurred for file_id: {file_id}: {exc}")
-                return item['row_id'], file_id, etag
+                db.rollback()
+                self.dbConnectionPool.putconn(db)
+                return item['row_id'], error
 
             try:
                 metadata = { 'file_id': file_id }
@@ -141,26 +150,27 @@ class UploadClient(QThread):
                 result = storage.fput_object(crd.minio.bucket, object_name, source,
                     content_type='audio/x-wav', metadata=metadata, tags=tags)
                 # set upload timestamp
-                query = 'UPDATE {}.files_audio SET updated_at = CURRENT_TIMESTAMP WHERE file_id = %s'.format(crd.db.schema)
+                query = 'UPDATE {schema}.files_audio SET updated_at = CURRENT_TIMESTAMP WHERE file_id = %s'.format(schema=crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
                 # report
                 # logger.info(f'created {result.object_name}; file_id: {file_id}, etag: {result.etag}')
             except Exception as exc:
                 # delete record from db
-                query = 'DELETE FROM {}.files_audio WHERE file_id = %s'.format(crd.db.schema)
+                query = 'DELETE FROM {schema}.files_audio WHERE file_id = %s'.format(schema=crd.db.schema)
                 cursor.execute(query, (file_id,))
                 db.commit()
+                error = 'upload error'
                 # report
                 # logger.error(f"error occurred for file_id: {file_id}: {exc}")
             finally:
                 cursor.close()
                 self.dbConnectionPool.putconn(db)
-                return item['row_id'], file_id, result.etag
+                return item['row_id'], error
 
         with ThreadPoolExecutor(CPU_THREADS) as executor:
             count = 0
-            for row_id, file_id, etag in executor.map(upload_worker, self.fileset):
+            for row_id, error in executor.map(upload_worker, self.fileset):
                 count += 1
-                self.countChanged.emit(count, row_id, file_id, etag)
+                self.countChanged.emit(count, row_id, error)
             self.uploadFinished.emit(count)

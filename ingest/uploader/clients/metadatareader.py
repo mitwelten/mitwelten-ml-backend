@@ -118,9 +118,9 @@ class MetaDataReader(QThread):
         )
         SELECT f.sha256 = n.sha256 as hash_match,
             f.object_name = n.object_name as object_name_match
-        from {}.files_audio f, n
+        from {schema}.files_audio f, n
         where (f.sha256 = n.sha256 or f.object_name = n.object_name)
-        '''.format(crd.db.schema)
+        '''.format(schema=crd.db.schema)
         cursor.execute(query, (item['sha256'], item['node_label'], item['time_start'], item['node_label'], item['time_start'], '.wav'))
         result = cursor.fetchone()
         if result is None:

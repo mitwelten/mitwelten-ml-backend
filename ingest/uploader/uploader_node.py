@@ -25,7 +25,6 @@ import uploader_node_config as cfg
 
 BS = 65536
 APIURL = crd.api.url
-# APIURL = 'http://localhost:8000'
 COLS = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
 
 
@@ -237,12 +236,11 @@ def worker(queue: Queue):
             elif validation['node_deployed'] == False:
                 cur.execute('update files set state = -6 where file_id = ?', [d['file_id']])
                 conn.commit()
-                raise Exception('node is/was not deployed at requested time:', d['node_label'], d['timestamp'].isoformat())
+                raise Exception('node is/was not deployed at requested time:', d['node_label'], d['timestamp'])
             else:
                 if VERBOSE: print('new file:', validation['object_name'])
-                d['object_name'] = validation['object_name']
-                d['node_id']     = validation['node_id']
-                d['location_id'] = validation['location_id']
+                d['object_name']   = validation['object_name']
+                d['deployment_id'] = validation['deployment_id']
 
         except Exception as e:
             print('Validation failed:', str(e))
@@ -270,8 +268,8 @@ def worker(queue: Queue):
             # store metadata in postgres
             d['resolution'] = (d['resolution_x'], d['resolution_y'])
             r = api.post(f'{APIURL}/ingest/image',
-                json={ k: d[k] for k in ('object_name', 'sha256', 'node_label', 'node_id',
-                    'location_id', 'timestamp', 'file_size', 'resolution')})
+                json={ k: d[k] for k in ('object_name', 'sha256', 'deployment_id',
+                    'timestamp', 'file_size', 'resolution')})
 
             # this should be caught as MetadataInsertException for distinct status
             r.raise_for_status()
@@ -527,19 +525,22 @@ def main():
         while True: # This could be handled in the system unit, restart after exit, with delay
             try:
                 # waiting in the beginning gives other jobs time to finish before this one
-                if args.timed: time.sleep(600)
-                if not check_ontime(cfg.meta, args.timed):
-                    continue
+                if args.timed:
+                    time.sleep(600)
+                    if not check_ontime(cfg.meta, args.timed):
+                        continue
 
                 print('extracting metadata, checking for file corruption')
                 records = c.execute('select file_id, path from files where sha256 is null and state = 0').fetchall()
 
                 for batch, i in chunks(records, BATCHSIZE):
-                    if not check_ontime(cfg.meta, args.timed) or not sig_ctrl['run']:
+                    if (args.timed and not check_ontime(cfg.meta, args.timed)) or not sig_ctrl['run']:
                         break
 
-                    # check if file is readable. if not, skip  to waiting for next iteration
+                    # check if file is readable. if not, skip to waiting for next iteration
                     try:
+                        # rudimentary check if HDD is lost.
+                        # problem: if the file is not there for other reasons, it stops the whole process anyways
                         is_readable_file(batch[0][1])
                     except:
                         break

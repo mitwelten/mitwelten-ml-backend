@@ -43,6 +43,8 @@ class CustomTableModel(QAbstractTableModel):
         data = self.files[row]
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if column == 0:
+                if 'error' in data:
+                    return f"check: {data['error']}"
                 if data['duplicate_check'][0] or data['duplicate_check'][1]:
                     state = []
                     if data['duplicate_check'][0]:

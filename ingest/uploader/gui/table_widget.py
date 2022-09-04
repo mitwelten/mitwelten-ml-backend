@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
 
 import re
 from time import time
+from datetime import timedelta
 import psycopg2 as pg
 from psycopg2 import pool
 
@@ -139,13 +140,17 @@ class Widget(QWidget):
     def onIndexIteration(self, count):
         self.statusLabel.setText(f'Indexing paths: {count}')
 
-    def onUploadIteration(self, count, row_id, file_id, etag):
-        self.statusLabel.setText(f'Uploaded file with ID {file_id} and etag {etag}')
+    def onUploadIteration(self, count, row_id, error):
         # setting value to progress bar
         self.pbar.setValue(count)
         for r in self.to_upload:
             if r['row_id'] == row_id:
-                r['row_state'] = 1 if etag else 0
+                if error == '': # pyqtSignal coerces None to ''
+                    r['row_state'] = 1
+                else:
+                    r['error'] = error
+                    r['row_state'] = 0
+                break
         # update the table
         if (time() - self.redraw_timer) > (max(1, min(60, self.pbar.maximum() / 1000))):
             self.model.layoutChanged.emit()
@@ -207,13 +212,13 @@ class Widget(QWidget):
         node_labels = []
         for n in nodes:
             start = '-inf' if n[0].lower == None else n[0].lower.strftime('%Y-%m-%d')
-            end = 'inf' if n[0].upper == None else n[0].upper.strftime('%Y-%m-%d')
+            end = 'inf' if n[0].upper == None else (n[0].upper - timedelta(seconds=1)).strftime('%Y-%m-%d')
             node_labels.append(f'{n[2]} ({start} - {end})')
         return node_labels
 
     def connectDb(self):
         if self.dbPool == None:
-            self.statusLabel.setText(f'Connecting to database server')
+            self.statusLabel.setText(f'Connecting to database server...')
             credentials = {
                 'host':crd.db.host,
                 'port':crd.db.port,
@@ -228,6 +233,7 @@ class Widget(QWidget):
                 self.statusLabel.setText(f'Unable to connect to database server. Are you connected to the FHNW network?')
                 return False
             else:
+                self.statusLabel.setText(f'Connected to database server.')
                 self.dbPool = pool.ThreadedConnectionPool(5, 10, **credentials)
                 return True
         else:
