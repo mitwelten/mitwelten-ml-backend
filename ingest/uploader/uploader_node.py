@@ -25,7 +25,6 @@ import uploader_node_config as cfg
 
 BS = 65536
 APIURL = crd.api.url
-# APIURL = 'http://localhost:8000'
 COLS = ['file_id', 'sha256', 'path', 'state', 'file_size', 'node_label', 'timestamp', 'resolution_x', 'resolution_y']
 
 
