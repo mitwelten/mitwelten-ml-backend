@@ -536,8 +536,10 @@ def main():
                     if not check_ontime(cfg.meta, args.timed) or not sig_ctrl['run']:
                         break
 
-                    # check if file is readable. if not, skip  to waiting for next iteration
+                    # check if file is readable. if not, skip to waiting for next iteration
                     try:
+                        # rudimentary check if HDD is lost.
+                        # problem: if the file is not there for other reasons, it stops the whole process anyways
                         is_readable_file(batch[0][1])
                     except:
                         break
