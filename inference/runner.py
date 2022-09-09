@@ -222,7 +222,6 @@ def worker(queue, localcfg):
             print(f'task {task[0]} failed ({str(e)}), retrying.', flush=True)
             connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
             connection.cursor().execute(finish_query, (0, task[0],))
-            break
         except:
             print(f'task {task[0]} failed')
             print(traceback.format_exc(), flush=True)
