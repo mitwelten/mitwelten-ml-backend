@@ -218,7 +218,7 @@ def worker(queue, localcfg):
             # those also may have already been deleted
             cursor.execute(finish_query, (3, task[0],))
             break
-        except errors.OperationalError as e:
+        except (errors.OperationalError, errors.InterfaceError) as e:
             print(f'task {task[0]} failed ({str(e)}), retrying.', flush=True)
             # reopen connection, recreate cursor
             connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
