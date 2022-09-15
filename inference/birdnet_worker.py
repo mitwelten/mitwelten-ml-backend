@@ -41,13 +41,11 @@ class BirdnetWorker(object):
 
         cfg.CODES_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', cfg.CODES_FILE)
 
-    def __del__(self):
-        self.cursor.close()
-
     def configure(self, task_id, localcfg):
         self.task_id = task_id
         self.source_path = localcfg['source_path']
-        self.connection.cursor().execute(f'''
+        cursor = self.connection.cursor()
+        cursor.execute(f'''
         select t.file_id, i.object_name, i.time, c.config,
         floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
         from {SCHEMA}.birdnet_tasks t
@@ -55,7 +53,7 @@ class BirdnetWorker(object):
         left join {SCHEMA}.birdnet_input i on i.file_id = t.file_id
         where t.task_id = %s
         ''', (self.task_id,))
-        self.file_id, self.object_name, self.timestamp, self.config, self.week = self.cursor.fetchone()
+        self.file_id, self.object_name, self.timestamp, self.config, self.week = cursor.fetchone()
 
         # db config format:     BirdNET_GLOBAL_2K_V2.1_Model_FP32
         # protobuf (tf gpu):    checkpoints/V2.1/BirdNET_GLOBAL_2K_V2.1_Model
