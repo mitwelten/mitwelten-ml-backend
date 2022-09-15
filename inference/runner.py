@@ -127,6 +127,10 @@ class Runner(object):
                 else:
                     print('sleeping...', end='\r')
                     time.sleep(10)
+            except (errors.OperationalError, errors.InterfaceError) as e:
+                print(f'queuing task failed ({str(e)}), retrying.', flush=True)
+                # reopen connection, recreate cursor
+                connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
             except KeyboardInterrupt:
                 break
             except GeneratorExit:
