@@ -103,11 +103,11 @@ class Runner(object):
     def get_tasks(self):
         # run on dedicated connection
         connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-        cursor = connection.cursor()
         while True:
             try:
                 # https://www.postgresql.org/docs/current/explicit-locking.html
                 # https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE
+                cursor = connection.cursor()
                 cursor.execute(f''' -- update {crd.db.schema}.birdnet_tasks
                 update {crd.db.schema}.birdnet_tasks
                 set state = 1
@@ -135,7 +135,6 @@ class Runner(object):
             except:
                 print(traceback.format_exc(), flush=True)
                 break
-        cursor.close()
         connection.close()
 
 
@@ -180,7 +179,6 @@ def worker(queue, localcfg):
     '''Read tasks from queue and process them using BirdnetWorker'''
 
     connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-    cursor = connection.cursor()
     birdnet = BirdnetWorker(connection)
 
     start_query = f'''
@@ -207,7 +205,7 @@ def worker(queue, localcfg):
             break
 
         try:
-            cursor.execute(start_query, (task[0],))
+            connection.cursor().execute(start_query, (task[0],))
             connection.commit()
             birdnet.configure(task[0], localcfg)
             birdnet.load_species_list()
@@ -216,21 +214,20 @@ def worker(queue, localcfg):
             # let the task fail.
             # at this point some results may have been written to db,
             # those also may have already been deleted
-            cursor.execute(finish_query, (3, task[0],))
+            connection.cursor().execute(finish_query, (3, task[0],))
             break
         except (errors.OperationalError, errors.InterfaceError) as e:
             print(f'task {task[0]} failed ({str(e)}), retrying.', flush=True)
             # reopen connection, recreate cursor
             connection = pg.connect(host=crd.db.host, port=crd.db.port, database=crd.db.database, user=crd.db.user, password=crd.db.password)
-            cursor = connection.cursor()
-            cursor.execute(finish_query, (0, task[0],))
+            connection.cursor().execute(finish_query, (0, task[0],))
         except:
             print(f'task {task[0]} failed')
             print(traceback.format_exc(), flush=True)
-            cursor.execute(finish_query, (3, task[0],))
+            connection.cursor().execute(finish_query, (3, task[0],))
         else:
             print(f'task {task[0]} succeeded')
-            cursor.execute(finish_query, (2, task[0],))
+            connection.cursor().execute(finish_query, (2, task[0],))
         finally:
             connection.commit()
 

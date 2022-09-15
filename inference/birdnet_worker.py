@@ -30,7 +30,6 @@ class BirdnetWorker(object):
 
     def __init__(self, connection):
         self.connection = connection
-        self.cursor = connection.cursor()
 
         self.task_id = None
         self.file_id = None
@@ -48,7 +47,7 @@ class BirdnetWorker(object):
     def configure(self, task_id, localcfg):
         self.task_id = task_id
         self.source_path = localcfg['source_path']
-        self.cursor.execute(f'''
+        self.connection.cursor().execute(f'''
         select t.file_id, i.object_name, i.time, c.config,
         floor((extract(doy from time) - 1)/(365/48.))::integer + 1 as week
         from {SCHEMA}.birdnet_tasks t
@@ -218,7 +217,7 @@ class BirdnetWorker(object):
         except:
             # delete results from db
             print(f'error/interrupt occurred during prediction, deleting results for task {self.task_id}')
-            self.cursor.execute(f'delete from {SCHEMA}.birdnet_results where task_id = %s', (self.task_id,))
+            self.connection.cursor().execute(f'delete from {SCHEMA}.birdnet_results where task_id = %s', (self.task_id,))
             self.connection.commit()
             raise
         finally:
@@ -247,7 +246,7 @@ class BirdnetWorker(object):
                         label.split('_')[0]))
         if PDEBUG: print('count of results after filtering:', len(data))
         try:
-            execute_values(self.cursor, insert_query, data, template=None, page_size=100)
+            execute_values(self.connection.cursor(), insert_query, data, template=None, page_size=100)
             self.connection.commit()
         except:
             self.connection.rollback()
