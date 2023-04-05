@@ -88,5 +88,4 @@ systemctl --user start mitwelten-exporter.service
 ## Monitoring
 
 `mitwelten-exporter` depends on `prometheus-node-exporter` to read and expose the metrics to the prometheus server.
-In order to read metrics from `prometheus-node-exporter`, the corresponding port (see above) needs to be accessible,
-which requires remote access.
+In order to read metrics from `prometheus-node-exporter`, the corresponding port (see above) needs to be accessible remotely.
