@@ -30,6 +30,11 @@ pip install -U pip
 pip install -r requirements-uploader-node.txt
 ```
 
+### Credentials
+
+Make sure the credentials file exists in `UPLOADERDIR`,
+with `MinioConfig` and `RestApiConfig` set.
+
 ### Check paths / configuration
 
 Check if the paths are correctly setup in the system units.

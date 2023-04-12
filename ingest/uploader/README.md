@@ -3,7 +3,7 @@
 ## Credentials
 
 To run the app or cli, you need to store the PostgreSQL and minIO credentials in a
-file `credentials.py` (see [`credentials_example.py`](../../credentials_example.py)).
+file `./credentials.py` (see [`credentials_example.py`](../../credentials_example.py)).
 
 ## Upload Image Files (manual)
 
