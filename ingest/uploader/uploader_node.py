@@ -489,7 +489,7 @@ def main():
                 if is_mountpoint: check_mountpoint(args.index)
                 print('indexing')
                 checkpoint = c.execute('''select time_out from checkpoints where type = 'index' ''').fetchone()
-                checkpoint = 0 if checkpoint == None else checkpoint[0]
+                checkpoint = 0 if checkpoint == None else (0 if checkpoint[0] == None else checkpoint[0])
                 c.execute('''insert into checkpoints(type, time_in) values ('index', strftime('%s'))
                     on conflict(type) do update set time_in = strftime('%s')''')
                 database.commit()
