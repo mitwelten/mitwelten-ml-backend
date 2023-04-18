@@ -138,7 +138,7 @@ def main():
 
         uploader_stats = get_uploader_stats(index_db)
         for s in uploader_stats:
-            collectors['file_upload_state'].labels(m['target']['name'], s['state']).set(s['count'])
+            collectors['file_upload_state'].labels(s['state']).set(s['count'])
 
         collectors['node_mountpoint_state'].set(get_mountpoint_state())
 
