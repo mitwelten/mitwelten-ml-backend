@@ -111,7 +111,7 @@ def main():
         'cam_response_code': Gauge('cam_response_code', 'HTTP response code', ['endpoint'], registry=registry),
         'cam_reachable': Gauge('cam_reachable', 'Cam reachable though HTTP', ['endpoint'], registry=registry),
         'node_mountpoint_state': Gauge('node_mountpoint_state', 'Disk mountpoint state (1: mounted and readable)', registry=registry),
-        'file_upload_state': Gauge('file_upload_state', 'File upload status', registry=registry)
+        'file_upload_state': Gauge('file_upload_state', 'File upload status', ['state'], registry=registry)
     }
 
     if args.report_dht:
