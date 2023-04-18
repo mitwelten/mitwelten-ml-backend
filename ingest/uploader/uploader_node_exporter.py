@@ -95,7 +95,7 @@ def main():
     else:
         raise Exception(f'Can\'t write to file {args.metrics_path}')
 
-    database = sqlite3.connect(args.config_db)
+    config_db = sqlite3.connect(f'file:{args.config_db}?mode=ro', uri=True)
 
     registry = CollectorRegistry()
     collectors = {
@@ -116,7 +116,7 @@ def main():
 
     while True:
 
-        records = database.execute('select id, url, enabled, status_code from cameras').fetchall()
+        records = config_db.execute('select id, url, enabled, status_code from cameras').fetchall()
         targets = [{'name': r[0], 'url': r[1], 'enabled': r[2], 'status': r[3]} for r in records]
         http_metrics = asyncio.run(test_http_targets(targets, args.http_timeout))
         for m in http_metrics:
