@@ -2,6 +2,8 @@
 
 ## Installation
 
+For complete installation instructions of a APGateway refer to [mitwelten-iot-hardware-poc/RaspberryPi/APGateway/README.md](https://github.com/mitwelten/mitwelten-iot-hardware-poc/blob/main/RaspberryPi/APGateway/README.md).
+
 ### Install dependencies
 
 ```bash
