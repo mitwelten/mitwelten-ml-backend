@@ -35,6 +35,10 @@ async def get_response(client, target, timeout):
             'status': s,
         }
 
+def get_uploader_stats(index_db):
+    records = index_db.execute('select count(*) as file_count, state from files group by state order by state;')
+    return [{'state': r[1], 'count': r[0]} for r in records if r[1] != None]
+
 def get_mountpoint_state():
     mountpoint = '/mnt/elements'
     '''Check if capture disk is mounted (1: mounted, 0: error)'''
@@ -80,8 +84,11 @@ def is_readable_file(arg):
 
 def main():
 
+    path = os.path.dirname(os.path.abspath(__file__))
+
     parser = argparse.ArgumentParser(description='Mitwelten cam accesspoint - prometheus textfile exporter')
     parser.add_argument('--config-db',    help='Path to AP config sqlite db', type=lambda f: is_readable_file(f), required=True)
+    parser.add_argument('--index-db',     help='Path to uploader file index sqlite db', type=lambda f: is_readable_file(f), default=f'{path}/file_index.db')
     parser.add_argument('--metrics-path', help='Metrics output file path', required=True)
     parser.add_argument('--interval',     help='Gathering inteval in seconds', default='2')
     parser.add_argument('--mountpoint',   help='External HDD mountpoint to check', default='/mnt/elements')
@@ -96,13 +103,15 @@ def main():
         raise Exception(f'Can\'t write to file {args.metrics_path}')
 
     config_db = sqlite3.connect(f'file:{args.config_db}?mode=ro', uri=True)
+    index_db = sqlite3.connect(f'file:{args.index_db}?mode=ro', uri=True)
 
     registry = CollectorRegistry()
     collectors = {
         'cam_response_latency': Gauge('cam_response_latency', 'HTTP response latency', ['endpoint'], unit='seconds', registry=registry),
         'cam_response_code': Gauge('cam_response_code', 'HTTP response code', ['endpoint'], registry=registry),
         'cam_reachable': Gauge('cam_reachable', 'Cam reachable though HTTP', ['endpoint'], registry=registry),
-        'node_mountpoint_state': Gauge('node_mountpoint_state', 'Disk mountpoint state (1: mounted and readable)', registry=registry)
+        'node_mountpoint_state': Gauge('node_mountpoint_state', 'Disk mountpoint state (1: mounted and readable)', registry=registry),
+        'file_upload_state': Gauge('file_upload_state', 'File upload status', registry=registry)
     }
 
     if args.report_dht:
@@ -126,6 +135,10 @@ def main():
                 collectors['cam_reachable'].labels(m['target']['name']).set(1)
             else:
                 collectors['cam_reachable'].labels(m['target']['name']).set(0)
+
+        uploader_stats = get_uploader_stats(index_db)
+        for s in uploader_stats:
+            collectors['file_upload_state'].labels(m['target']['name'], s['state']).set(s['count'])
 
         collectors['node_mountpoint_state'].set(get_mountpoint_state())
 
