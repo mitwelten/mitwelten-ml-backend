@@ -19,3 +19,4 @@ class RestApiConfig(object):
 
 db = DbConfig()
 minio = MinioConfig()
+api = RestApiConfig()
