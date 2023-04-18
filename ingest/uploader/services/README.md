@@ -55,7 +55,10 @@ All units:
 
 ```bash
 mkdir $HOME/monitoring
-echo 'ARGS="--web.listen-address=\":9958\" --collector.textfile.directory=\"/home/pi/monitoring/\""' \
+echo 'ARGS="--web.listen-address=\":9958\"
+ --collector.textfile.directory=\"/home/pi/monitoring/\"
+ --collector.filesystem.ignored-mount-points=\"^/(dev|proc|run|sys|media|var/lib/docker)($|/)\""' \
+  | tr -d '\n' \
   | sudo tee --append /etc/default/prometheus-node-exporter
 ```
 
