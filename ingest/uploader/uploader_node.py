@@ -70,11 +70,13 @@ def build_file_lists(basepath, checkpoint: float = 0):
 
     for root, dirs, files in os.walk(os.fspath(basepath)):
 
-        # match root to node_id/date/hour
-        # skip directories older than checkpoint - 1h
+        # match root to node_id/date/hour,
+        # skipping directories until this pattern matches
         m = re.match(r'.*/\d{4}-\d{4}/(\d{4}-\d\d-\d\d)/(\d\d)(?:/?|.+)', root)
         if m == None:
             continue
+
+        # skip directories older than checkpoint - 1h
         ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
         if ts < (checkpoint - (checkpoint % 3600)): # round checkpoint to hour of ts
             continue
@@ -490,6 +492,8 @@ def main():
                 print('indexing')
                 checkpoint = c.execute('''select time_out from checkpoints where type = 'index' ''').fetchone()
                 checkpoint = 0 if checkpoint == None else (0 if checkpoint[0] == None else checkpoint[0])
+                # insert indexing-start-ts,
+                # if checkpoint already exists, only update indexing-start-ts of current checkpoint
                 c.execute('''insert into checkpoints(type, time_in) values ('index', strftime('%s'))
                     on conflict(type) do update set time_in = strftime('%s')''')
                 database.commit()
