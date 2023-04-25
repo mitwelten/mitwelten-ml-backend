@@ -77,7 +77,7 @@ def build_file_lists(basepath, checkpoint: float = 0):
             continue
 
         # skip directories older than checkpoint - 1h
-        ts = datetime.strptime('{} {}'.format(*m.groups()), '%Y-%m-%d %H').timestamp()
+        ts = datetime.strptime('{} {}+00:00'.format(*m.groups()), '%Y-%m-%d %H%z').timestamp()
         if ts < (checkpoint - (checkpoint % 3600)): # round checkpoint to hour of ts
             continue
 
