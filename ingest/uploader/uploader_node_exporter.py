@@ -37,7 +37,16 @@ async def get_response(client, target, timeout):
 
 def get_uploader_stats(index_db):
     records = index_db.execute('select count(*) as file_count, state from files group by state order by state;')
-    return [{'state': r[1], 'count': r[0]} for r in records if r[1] != None]
+    statecounts = [r for r in records] # cursor to list
+    stats = []
+    for code in [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 42]:
+        # works only on python >= 3.8 (walrus operator)
+        # if count := [t[0] for t in statecounts if code == t[1]] or 0:
+        count = [t[0] for t in statecounts if code == t[1]] or 0 # python < 3.8
+        if count:
+            count = count[0]
+        stats.append({'state': code, 'count': count})
+    return stats
 
 def get_mountpoint_state():
     mountpoint = '/mnt/elements'
