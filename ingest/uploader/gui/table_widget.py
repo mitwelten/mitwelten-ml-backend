@@ -1,6 +1,6 @@
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QHBoxLayout, QComboBox, QDialogButtonBox,
     QVBoxLayout, QFileDialog, QVBoxLayout, QLabel, QProgressBar,
     QPushButton, QHeaderView, QSizePolicy, QTableView, QWidget)
 
@@ -51,8 +51,8 @@ class Widget(QWidget):
         # QTableView Headers
         self.horizontal_header = self.table_view.horizontalHeader()
         self.vertical_header = self.table_view.verticalHeader()
-        self.horizontal_header.setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.vertical_header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontal_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.horizontal_header.setStretchLastSection(True)
 
         # QWidget Layout
@@ -61,7 +61,7 @@ class Widget(QWidget):
         self.selector_layout = QHBoxLayout()
 
         ## table layout
-        size = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        size = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         size.setHorizontalStretch(1)
         size.setVerticalStretch(1)
         self.table_view.setSizePolicy(size)
@@ -85,9 +85,9 @@ class Widget(QWidget):
         self.uploadButton.setEnabled(False)
 
         # [group] of buttons above
-        buttonBox = QDialogButtonBox(Qt.Horizontal);
-        buttonBox.addButton(self.importButton, QDialogButtonBox.ActionRole)
-        buttonBox.addButton(self.uploadButton, QDialogButtonBox.ActionRole)
+        buttonBox = QDialogButtonBox(Qt.Orientation.Horizontal);
+        buttonBox.addButton(self.importButton, QDialogButtonBox.ButtonRole.ActionRole)
+        buttonBox.addButton(self.uploadButton, QDialogButtonBox.ButtonRole.ActionRole)
         self.bottom_layout.addWidget(buttonBox)
 
         # create status label

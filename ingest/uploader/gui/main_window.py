@@ -1,6 +1,6 @@
 
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QAction, QMainWindow
+from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtWidgets import QMainWindow
 
 class MainWindow(QMainWindow):
     def __init__(self, widget) -> None:
@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
 
         ## Exit QAction
         exit_action = QAction('Exit', self)
-        exit_action.setShortcut(QKeySequence.Quit)
+        exit_action.setShortcut(QKeySequence.StandardKey.Quit)
         exit_action.triggered.connect(self.close)
 
         self.file_menu.addAction(exit_action)

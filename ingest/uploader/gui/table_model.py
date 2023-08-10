@@ -1,5 +1,5 @@
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
-from PyQt5.QtGui import QColor
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt6.QtGui import QColor
 
 class CustomTableModel(QAbstractTableModel):
     def __init__(self):
@@ -20,9 +20,9 @@ class CustomTableModel(QAbstractTableModel):
         return parent.isValid() if 0 else 8
 
     def headerData(self, section, orientation, role):
-        if role != Qt.DisplayRole:
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == Qt.Horizontal:
+        if orientation == Qt.Orientation.Horizontal:
             return ('Action', 'Start Date', 'Duration', 'Filesize', 'Samplerate', 'Recording Status', 'Comment', 'Source File Path')[section]
         else:
             return f"{section}"
@@ -37,11 +37,11 @@ class CustomTableModel(QAbstractTableModel):
         self.endRemoveRows()
         return True
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         column = index.column()
         row = index.row()
         data = self.files[row]
-        if role == Qt.DisplayRole or role == Qt.EditRole:
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.EditRole:
             if column == 0:
                 if 'error' in data:
                     return f"check: {data['error']}"

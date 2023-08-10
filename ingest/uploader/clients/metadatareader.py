@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from os.path import basename, dirname
 
 import mimetypes
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 from concurrent.futures import ThreadPoolExecutor
 
 import credentials as crd
