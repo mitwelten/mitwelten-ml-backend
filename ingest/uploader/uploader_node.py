@@ -601,6 +601,7 @@ def main():
 
                 # TODO: move to worker. like this it doesn't stop the worker from running
                 if not check_ontime(cfg.upload, args.timed):
+                    time.sleep(600)
                     continue
 
                 queue = Queue(maxsize=1)
