@@ -340,12 +340,15 @@ def worker(queue: Queue):
         queue.task_done()
     conn.close()
 
-def get_tasks(conn: sqlite3.Connection):
+def get_tasks(conn: sqlite3.Connection, timed=False):
     '''
     yield records marked as 'in progress' (status = 3)
     '''
 
     while True:
+        if not check_ontime(cfg.upload, timed):
+            time.sleep(600)
+            continue
         file_id = None
         try:
             record_raw = conn.execute(f'select {",".join(COLS)} from files where state = 1 limit 1').fetchone()
@@ -597,16 +600,10 @@ def main():
         signal.signal(signal.SIGINT, sigterm_handler)
 
         nthreads_upload = cfg.upload.threads if cfg.upload.threads else NTHREADS
-        tasks = get_tasks(database)
+        tasks = get_tasks(database, args.timed)
 
         while sig_ctrl['run']: # This could be handled in the system unit, restart after exit, with delay
             try:
-
-                # TODO: move to worker. like this it doesn't stop the worker from running
-                if not check_ontime(cfg.upload, args.timed):
-                    time.sleep(600)
-                    continue
-
                 queue = Queue(maxsize=1)
                 pool = ThreadPool(nthreads_upload, initializer=worker, initargs=(queue,))
 
