@@ -119,6 +119,7 @@ For option reference try `python runner.py -h`
 | 1     | running             |
 | 2     | suceeded            |
 | 3     | failed              |
+| 4     | paused              |
 
 #### Configuration options
 
