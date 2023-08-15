@@ -357,7 +357,10 @@ def get_tasks(conn: sqlite3.Connection):
                 try:
                     is_readable_file(record['path'])
                 except:
-                    time.sleep(600)
+                    if VERBOSE: print('is_readable_file error', record['path'])
+                    conn.execute('update files set state = -8 where file_id = ?', [record['file_id']])
+                    conn.commit()
+                    time.sleep(1) # slow down
                     continue
 
                 # mark file as queued

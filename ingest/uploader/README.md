@@ -229,6 +229,7 @@ delete --> set_state_4
 |    -5 | failed to insert metadata in db
 |    -6 | node is/was not deployed at requested time
 |    -7 | file not found locally
+|    -8 | file read error
 |       | __success states__
 |     1 | checked, no local duplicate, file intact
 |     2 | upload successful
