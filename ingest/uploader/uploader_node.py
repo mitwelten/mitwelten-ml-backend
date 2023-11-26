@@ -84,6 +84,7 @@ def build_file_lists(basepath, checkpoint: float = 0):
         # index files
         for file in files:
             filepath = os.path.abspath(os.path.join(root, file))
+            # TODO: thoroughly test this
             if os.stat(os.path.dirname(filepath)).st_mtime < checkpoint:
                 break # skip directory if not modified since last checkpoint
             try:
