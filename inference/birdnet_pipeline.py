@@ -9,10 +9,12 @@ from queue import Empty as QueueEmpty
 import time
 import os
 
+sys.path.append('../')
+sys.path.append('birdnet_pipeline/birdnet/')
+
 from birdnet_pipeline.birdnet_batches import batches
 from birdnet_pipeline.birdnet_worker import BirdnetWorker
 
-sys.path.append('../')
 import credentials as crd
 
 class BirdnetConfig(object):
