@@ -139,6 +139,7 @@ class BirdnetWorker(object):
                     access_key=crd.minio.access_key,
                     secret_key=crd.minio.secret_key,
                 )
+                # TODO: load directly to numpy array
                 tmppath = os.path.join(temp_dir.name, os.path.basename(self.object_name))
                 client.fget_object(crd.minio.bucket, self.object_name, tmppath)
                 file = sf.SoundFile(tmppath)
