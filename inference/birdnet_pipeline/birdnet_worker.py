@@ -13,15 +13,13 @@ import soundfile as sf
 import numpy as np
 from psycopg2.extras import execute_values
 
-sys.path.append('birdnet')
 import config as cfg
 import model
 
-sys.path.append('../')
 import credentials as crd
 
-import lib.audio as audio
-from birdnet.analyze import loadCodes, loadLabels, predictSpeciesList, loadSpeciesList
+from .lib import audio
+from .birdnet.analyze import loadCodes, loadLabels, predictSpeciesList, loadSpeciesList
 
 SCHEMA = crd.db.schema
 PDEBUG = False
