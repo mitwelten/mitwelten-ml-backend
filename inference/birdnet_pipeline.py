@@ -9,8 +9,8 @@ from queue import Empty as QueueEmpty
 import time
 import os
 
-from birdnet_batches import batches
-from birdnet_worker import BirdnetWorker
+from birdnet_pipeline.birdnet_batches import batches
+from birdnet_pipeline.birdnet_worker import BirdnetWorker
 
 sys.path.append('../')
 import credentials as crd

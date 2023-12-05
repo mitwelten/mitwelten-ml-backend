@@ -19,7 +19,7 @@ sys.path.append('birdnet')
 import config as cfg
 import model
 
-sys.path.append('../')
+sys.path.append('../../')
 import credentials as crd
 import lib.audio as audio
 
