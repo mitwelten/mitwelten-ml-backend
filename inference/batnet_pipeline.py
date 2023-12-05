@@ -90,7 +90,6 @@ def main():
         access_key=crd.minio.access_key,
         secret_key=crd.minio.secret_key,
     )
-    bucket = 'ixdm-mitwelten'
 
     model, params = api.load_model(DEFAULT_MODEL_PATH)
     time_expansion_factor = 1
@@ -140,7 +139,7 @@ def main():
             # print(f'got object name {object_name}')
 
             # download the object from minio storage
-            response = s3.get_object(bucket, object_name)
+            response = s3.get_object(crd.minio.bucket, object_name)
             bytes_buffer = io.BytesIO(response.read())
             audio_file = SoundFile(bytes_buffer)
             audio_file.__file_path__ = str(task_id)
