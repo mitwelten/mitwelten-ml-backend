@@ -34,15 +34,15 @@ pip install jupyterlab
 
 ### Running (Pipeline)
 
-Use `runner.py` to manage the task queue and run the pipeline.
+Use `birdnet_pipeline.py` to manage the task queue and run the pipeline.
 
-To schedule tasks, you choose a batch, defined in `birdnet_batches.py`. The files matching the corresponding query
+To schedule tasks, you choose a batch, defined in `birdnet_runner/birdnet_batches.py`. The files matching the corresponding query
 are added as tasks to the queue, referring to the batch ID. This is a crude mechanism to avoid running the same tasks
 multiple times (a batch can only be added once).
 
 ```bash
 # add batch with ID 7
-python runner.py --add-batch 7
+python birdnet_pipeline.py --add-batch 7
 ```
 
 In addition to the batch ID, a task refers to a configuration.
@@ -87,10 +87,10 @@ To read the input data from storage instead of S3, i.e. NFS, specify the root pa
 
 ```bash
 # Run the pipeline (on GPU)
-python runner.py --run --tf-gpu
+python birdnet_pipeline.py --run --tf-gpu
 
 # Read input from storage instead of S3
-python runner.py --run --tf-gpu --source /mitwelten
+python birdnet_pipeline.py --run --tf-gpu --source /mitwelten
 ```
 
 > _Resoning_: The model type could be read directly from [`birdnet/config.py`](./birdnet/config.py) and compared to the
