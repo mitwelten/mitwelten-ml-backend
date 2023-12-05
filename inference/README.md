@@ -271,3 +271,33 @@ left join files_audio f on f.file_id = o.file_id
 where o.confidence > 0.6
   and o.time_end < f.duration
 ```
+
+---
+
+## BatNET Pipeline
+
+### Installation
+
+```bash
+sudo git clone https://github.com/mitwelten/mitwelten-ml-backend.git /opt/mitwelten-ml-backend
+
+# add unprivileged user to run the inferrence service
+sudo adduser --system --group inferrence
+sudo chown -r inferrence:inferrence /opt/mitwelten-ml-backend
+
+# create credentials.py
+cd /opt/mitwelten-ml-backend/
+cp credentials-example.py credentials.py
+# edit
+
+# install dependencies for batnet pipeline
+cd /opt/mitwelten-ml-backend/inferrence
+sudo -u inferrence python -m venv .venv-batnet
+sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -U pip'
+sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -r batnet_pipeline/requirements.txt'
+
+# install and start systemd service unit
+sudo ln -s /opt/mitwelten-ml-backend/inferrence/serivces/mitwelten-batnet-pipeline.service /lib/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start mitwelten-batnet-pipeline.service
+```
