@@ -297,7 +297,8 @@ sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install
 sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -r batnet_pipeline/requirements.txt'
 
 # install and start systemd service unit
-sudo ln -s /opt/mitwelten-ml-backend/inferrence/serivces/mitwelten-batnet-pipeline.service /lib/systemd/system/
+sudo ln -s /opt/mitwelten-ml-backend/inference/services/mitwelten-batnet-pipeline.service /lib/systemd/system/
 sudo systemctl daemon-reload
+sudo systemctl enable mitwelten-batnet-pipeline.service
 sudo systemctl start mitwelten-batnet-pipeline.service
 ```
