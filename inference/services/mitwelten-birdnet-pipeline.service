@@ -1,0 +1,15 @@
+[Unit]
+Description=Mitwelten BirdNET Pipeline: Run BirdNET analyser
+After=network.target
+
+[Service]
+Type=idle
+Restart=on-failure
+RestartSec=15
+User=inferrence
+WorkingDirectory=/opt/mitwelten-ml-backend/inference
+ExecStart=/opt/mitwelten-ml-backend/inference/.venv-birdnet/bin/python -u birdnet_pipeline.py --run
+TimeoutSec=30
+
+[Install]
+WantedBy=default.target

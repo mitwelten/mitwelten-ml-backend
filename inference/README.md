@@ -1,14 +1,47 @@
 # Inference
 
-## BirdNET
-
-### Setup
+## Setup
 
 ```bash
-git submodule update --init --depth 1 # clone BirdNET
 sudo apt-get install ffmpeg
-sudo pip install tensorflow librosa minio psycopg2
+sudo git clone https://github.com/mitwelten/mitwelten-ml-backend.git /opt/mitwelten-ml-backend
+cd /opt/mitwelten-ml-backend
+sudo git submodule update --init --depth 1
+
+# add unprivileged user to run the inferrence service
+sudo adduser --system --group inferrence
+sudo chown -r inferrence:inferrence /opt/mitwelten-ml-backend
+
+# create credentials.py
+cd /opt/mitwelten-ml-backend/
+cp credentials-example.py credentials.py
+# edit
 ```
+
+Proceed to pipeline specific instructions: [BirdNET](#birdnet-pipeline-setup) / [BatNET](#batnet-pipeline-setup).
+
+When running both pipelines, it's a good idea to let batdetect2 use the GPU and BirdNET the CPU, so each codebase
+uses the more suitable hardware.
+
+## BirdNET
+
+### BirdNET Pipeline Setup
+
+```bash
+# install dependencies for birdnet pipeline in virtual environment
+cd /opt/mitwelten-ml-backend/inferrence
+sudo -u inferrence python -m venv .venv-birdnet
+sudo -u inferrence /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -U pip'
+sudo -u inferrence /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -r birdnet_pipeline/requirements.txt'
+
+# install and start systemd service unit
+sudo ln -s /opt/mitwelten-ml-backend/inference/services/mitwelten-birdnet-pipeline.service /lib/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mitwelten-birdnet-pipeline.service
+sudo systemctl start mitwelten-birdnet-pipeline.service
+```
+
+### Setup (local, macOS)
 
 To get psycopg2 installed on macos arm64,
 provide linker/compiler info for openssl:
@@ -34,15 +67,15 @@ pip install jupyterlab
 
 ### Running (Pipeline)
 
-Use `runner.py` to manage the task queue and run the pipeline.
+Use `birdnet_pipeline.py` to manage the task queue and run the pipeline.
 
-To schedule tasks, you choose a batch, defined in `birdnet_batches.py`. The files matching the corresponding query
+To schedule tasks, you choose a batch, defined in `birdnet_runner/birdnet_batches.py`. The files matching the corresponding query
 are added as tasks to the queue, referring to the batch ID. This is a crude mechanism to avoid running the same tasks
 multiple times (a batch can only be added once).
 
 ```bash
 # add batch with ID 7
-python runner.py --add-batch 7
+python birdnet_pipeline.py --add-batch 7
 ```
 
 In addition to the batch ID, a task refers to a configuration.
@@ -87,13 +120,13 @@ To read the input data from storage instead of S3, i.e. NFS, specify the root pa
 
 ```bash
 # Run the pipeline (on GPU)
-python runner.py --run --tf-gpu
+python birdnet_pipeline.py --run --tf-gpu
 
 # Read input from storage instead of S3
-python runner.py --run --tf-gpu --source /mitwelten
+python birdnet_pipeline.py --run --tf-gpu --source /mitwelten
 ```
 
-> _Resoning_: The model type could be read directly from [`birdnet/config.py`](./birdnet/config.py) and compared to the
+> _Resoning_: The model type could be read directly from [`birdnet_pipeline/birdnet/config.py`](./birdnet_pipeline/birdnet/config.py) and compared to the
 > config in DB, but using the flag the choice it more explicit. By default no change in the config file is necessary, the
 > BirdNET repo stays clean and no flag is required, running on CPU. Running on GPU requires a change in the BirdNET repo,
 > which is confirmed by setting the `--tf-gpu` flag for the pipeline runner.
@@ -206,7 +239,7 @@ Details on the impact of week filter can be found in the corresponding [report](
 
 Files larger than 1.5 GB cause the analysis process to run out of memory and crash.
 
-## Defining datasets
+### Defining datasets
 
 Overview of dataset
 
@@ -240,7 +273,7 @@ where node_label ~ 'AM[12]' and duration >= 3 and not exists (
 order by time_start asc
 ```
 
-## Looking at results
+### Looking at results
 
 ```sql
 -- count results
@@ -270,4 +303,26 @@ from results o
 left join files_audio f on f.file_id = o.file_id
 where o.confidence > 0.6
   and o.time_end < f.duration
+```
+
+---
+
+## BatNET
+
+### BatNET Pipeline Setup
+
+```bash
+# install dependencies for batnet pipeline in virtual environment
+cd /opt/mitwelten-ml-backend/inferrence
+sudo -u inferrence python -m venv .venv-batnet
+sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -U pip'
+sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -r batnet_pipeline/requirements.txt'
+
+# install and start systemd service unit
+sudo ln -s /opt/mitwelten-ml-backend/inference/services/mitwelten-batnet-pipeline.service /lib/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mitwelten-batnet-pipeline.service
+
+# run the pipeline
+sudo systemctl start mitwelten-batnet-pipeline.service
 ```
