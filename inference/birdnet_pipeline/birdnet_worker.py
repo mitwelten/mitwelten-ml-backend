@@ -63,7 +63,7 @@ class BirdnetWorker(object):
             model_version_short = parts[1] # V2.1
             # since model version 2.2, the tflite mdata model is FP16
             mdata_name = 'MData_Model_FP16' if float(model_version_short[1:]) >= 2.2 else f'MData_{parts[2]}' # Model_FP32
-            MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{mdata_name}.tflite"
+            MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_{mdata_name}.tflite"
             LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
             MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
             CODES_FILE = 'eBird_taxonomy_codes_2021E.json' # path needs to be resolved relatively
