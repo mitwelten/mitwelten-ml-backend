@@ -65,15 +65,15 @@ class BirdnetWorker(object):
             MDATA_MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_MData_{model_end}.tflite"
             LABELS_FILE = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Labels.txt"
             MODEL_PATH = f"checkpoints/{model_version_short}/{self.config['model_version']}.tflite"
+            CODES_FILE = 'eBird_taxonomy_codes_2021E.json' # path needs to be resolved relatively
             if localcfg['TF_GPU']: # cli flag for the runner to choose between tflite and protobuf model
                 MODEL_PATH = f"checkpoints/{model_version_short}/{model_begin}_{model_version_short}_Model"
 
-            if os.path.basename(cfg.MODEL_PATH) != os.path.basename(MODEL_PATH):
-                raise ValueError(f'Model path mismatch: file={cfg.MODEL_PATH}, db={MODEL_PATH}. Can\'t load corresponding model.')
-
-            cfg.MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MODEL_PATH)
-            cfg.LABELS_FILE = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', LABELS_FILE)
-            cfg.MDATA_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'birdnet', MDATA_MODEL_PATH)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            cfg.MODEL_PATH = os.path.join(current_dir, 'birdnet', MODEL_PATH)
+            cfg.LABELS_FILE = os.path.join(current_dir, 'birdnet', LABELS_FILE)
+            cfg.MDATA_MODEL_PATH = os.path.join(current_dir, 'birdnet', MDATA_MODEL_PATH)
+            cfg.CODES_FILE = os.path.join(current_dir, 'birdnet', CODES_FILE)
 
             # porential cfg isolation issues:
             # cfg.MODEL_PATH (import, loadModel() etc.)
