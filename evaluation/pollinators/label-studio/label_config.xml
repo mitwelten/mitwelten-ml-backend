@@ -1,0 +1,31 @@
+<View>
+  <Header value="$header" />
+  <Image name="image" value="$image" zoom="true" zoomControl="true" />
+  <RectangleLabels name="pollinator" toName="image" canRotate="false">
+    <!-- pollinator classes -->
+    <Label value="fliege" background="#00dd00"/>
+    <Label value="hummel" background="#11bb33"/>
+    <Label value="honigbiene" background="#009944"/>
+    <Label value="schwebfliege" background="#007766"/>
+    <Label value="wildbiene" background="#006688"/>
+    <Label value="other_insect" background="#aaff00"/>
+  </RectangleLabels>
+  <RectangleLabels name="flower" toName="image" canRotate="false">
+    <!-- flower classes -->
+    <Label value="daisy" background="#dd4400"/>
+    <Label value="flockenblume" background="#ff8800"/>
+    <Label value="wildemoere" background="#eecc00"/>
+    <Label value="other_flower" background="#ff33aa"/>
+  </RectangleLabels>
+  <TextArea placeholder="Notes for this image" name="notes_image" toName="image" editable="true" perRegion="false" required="false" />
+  <View visibleWhen="region-selected">
+    <Header value="Describe this label" size="6" />
+    <Choices name="confidence" toName="image" perRegion="true" choice="single" showInLine="true" required="true">
+      <Choice value="high confidence"/>
+      <Choice value="medium confidence"/>
+      <Choice value="low confidence"/>
+      <Choice value="false positive"/>
+    </Choices>
+    <TextArea placeholder="Notes for this label" name="notes" toName="image" editable="true" perRegion="true" required="false" />
+  </View>
+</View>
