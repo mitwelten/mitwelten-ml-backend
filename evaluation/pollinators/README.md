@@ -2,7 +2,7 @@
 
 ## Generating Model Performance Metrics
 
-To generate the model performance metrics, use [`evaluate_model.py`](./evaluate.py). The script loads the ground truth data from label-studio JSON and the predictions from the database. It then compares the ground truth data (labels created manually in [label-studio](#label-studio-import)) with the predictions, and outputs metrics in CSV format to standard output.
+To generate the model performance metrics, use [`evaluate.py`](./evaluate.py). The script loads the ground truth data from label-studio JSON and the predictions from the database. It then compares the ground truth data (labels created manually in [label-studio](#label-studio-import)) with the predictions, and outputs metrics in CSV format to standard output.
 
 ### Usage
 
