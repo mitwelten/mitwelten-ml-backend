@@ -5,7 +5,7 @@ import psycopg2 as pg
 from minio import Minio
 import sys
 
-import tqdm
+from tqdm import tqdm
 
 sys.path.append('../..')
 import credentials as crd
@@ -26,13 +26,13 @@ def read_tasks_from_minio():
     object_list = s3.list_objects(bucket, recursive=False)
     tasks = []
     tqdm.write('reading tasks from minio storage...')
-    for obj in tqdm.tqdm(object_list):
+    for obj in tqdm(object_list):
         data = json.loads(s3.get_object(bucket, obj.object_name).read())
         if 'file_id' in data['task']['data']:
             tasks.append(data)
 
     # write tasks to json file
-    os.path.makedirs('ground_truth', exist_ok=True)
+    os.makedirs('ground_truth', exist_ok=True)
     with open('ground_truth/tasks.json', 'w') as f:
         json.dump(tasks, f)
 
