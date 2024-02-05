@@ -112,7 +112,7 @@ def match_all(gt_rects, p_rects, threshold=0.5):
     return (false_positives, false_negatives, true_positives)
 
 
-def main(user_id, threshold_flowers, threshold_pollinators):
+def main(project_id, user_id, threshold_flowers, threshold_pollinators):
     # read tasks from minio storage
     if not os.path.exists('ground_truth/tasks.json'):
         read_tasks_from_minio()
@@ -124,6 +124,8 @@ def main(user_id, threshold_flowers, threshold_pollinators):
         # there are multiple objects with the same task id those are labels by
         # different users. group the objects by task id.
         for t in tasks:
+            if t['task']['project'] != project_id:
+                continue
             task_id = t['task']['id']
             task_user = t['completed_by']['id']
             if task_id not in tasks_grouped:
@@ -222,9 +224,10 @@ def main(user_id, threshold_flowers, threshold_pollinators):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate predictions with ground truth data.')
-    parser.add_argument('user_id', type=int, help='User ID', default=5)
-    parser.add_argument('threshold_flowers', type=float, help='IoU threshold for matching flowers (0...1)', default=0.4)
-    parser.add_argument('threshold_pollinators', type=float, help='IoU threshold for matching pollinators (0...1)', default=0.3)
+    parser.add_argument('--project_id', type=int, help='Label Studio Project ID', default=5)
+    parser.add_argument('--user_id', type=int, help='Label Studio User ID', default=5)
+    parser.add_argument('--threshold_flowers', type=float, help='IoU threshold for matching flowers (0...1)', default=0.4)
+    parser.add_argument('--threshold_pollinators', type=float, help='IoU threshold for matching pollinators (0...1)', default=0.3)
     args = parser.parse_args()
 
-    main(args.user_id, args.threshold_flowers, args.threshold_pollinators)
+    main(args.project_id, args.user_id, args.threshold_flowers, args.threshold_pollinators)
