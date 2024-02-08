@@ -302,6 +302,24 @@ def evaluate_with_confidence(tasks):
         precision = tp_classes.get(c, 0) / (tp_classes.get(c, 0) + fp_classes.get(c, 0))
         print(tp_classes.get(c, 0), fp_classes.get(c, 0), f'{precision:.3f}', c, sep='\t')
 
+    # calculate average (user) confidence for each class
+    numeric_confidences_map = {'high confidence': 0.95, 'medium confidence': 0.7, 'low confidence': 0.2}
+    numeric_confidences = [(c[0], numeric_confidences_map[c[1]]) for c in conditions if c[1] != 'false positive']
+
+    confidences = {}
+    for c in numeric_confidences:
+        if c[0] not in confidences:
+            confidences[c[0]] = []
+        confidences[c[0]].append(c[1])
+    for c in confidences:
+        confidences[c] = sum(confidences[c]) / len(confidences[c])
+
+    print('---')
+    print('average user confidences')
+    print('avg c.', 'class', sep='\t')
+    for c in confidences:
+        print(f'{confidences[c]:.3f}', c, sep='\t')
+
 def main(mode, project_id, user_id, threshold_flowers, threshold_pollinators):
     # read tasks from minio storage
     cache_file = f'ground_truth/labelstudio_tasks.json'
