@@ -281,8 +281,7 @@ def evaluate_with_confidence(tasks):
     # there can be multiple results per task, so the length of the conditions
     # list is not equal to the number of tasks
     print(f'of {len(conditions)} predictions: {len(true_positives)} TP, {len(false_positives)} FP')
-    print(f'precision or positive predictive value (PPV): {len(true_positives) / (len(true_positives) + len(false_positives)):.3f}')
-    print('---')
+    print(f'overall precision or (positive predictive value, PPV): {len(true_positives) / (len(true_positives) + len(false_positives)):.3f}')
 
     tp_classes = {}
     fp_classes = {}
@@ -296,6 +295,8 @@ def evaluate_with_confidence(tasks):
                 fp_classes[c[0]] = 0
             fp_classes[c[0]] += 1
 
+    print('---')
+    print('precision (PPV) by class')
     print('tp', 'fp', 'ppv', 'class', sep='\t')
     for c in ['fliege', 'honigbiene', 'hummel', 'schwebfliege', 'wildbiene']:
         precision = tp_classes.get(c, 0) / (tp_classes.get(c, 0) + fp_classes.get(c, 0))
