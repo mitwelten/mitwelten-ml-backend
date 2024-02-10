@@ -1,0 +1,31 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Mitwelten Machine Learning Backend
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Cedric
+    family-names: Spindler
+    email: cedric.spindler@fhnw.ch
+    affiliation: FHNW
+    orcid: 'https://orcid.org/0000-0001-5080-0848'
+  - given-names: Timeo
+    family-names: Wullschleger
+    email: timeo.wullschleger@fhnw.ch
+    affiliation: FHNW
+  - given-names: Thomas
+    family-names: Amberg
+    email: thomas.amberg@fhnw.ch
+    affiliation: FHNW
+repository-code: 'https://github.com/mitwelten/mitwelten-ml-backend'
+url: 'https://mitwelten.org'
+abstract: >-
+  Mitwelten Machine Learning: Collection, Processing,
+  Exploration and Validation of data as part of the research
+  project.
+license: MIT
+commit: 16e1cf5d63bccf754bb68a7365a183298814597e
