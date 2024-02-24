@@ -76,4 +76,4 @@ left join (
 
 ### Example Project in Label Studio
 
-[Bats Text (Project ID 11)](https://label.mitwelten.org/projects/16/data?tab=45&task=75372) (with predictions)
+[Bats Text (Project ID 11)](https://label.mitwelten.org/projects/16/data?tab=45&task=75372) (with predictions). The template used for the labeling interface is stored in [label_config.xml](./label-studio/label_config.xml).
