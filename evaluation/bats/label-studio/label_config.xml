@@ -1,0 +1,15 @@
+<View>
+  <Filter name="fl" toName="label" hotkey="shift+f" minlength="1" />
+  <Labels name="label" toName="audio" value="$species" showInLine="true" hotkey="ctrl+enter"></Labels>
+  <Audio name="audio" value="$audio" defaultscale="18" height="280" defaultzoom="1" player="webaudio" />
+  <View visibleWhen="region-selected">
+    <Header value="Describe this label" size="6" />
+    <Choices name="confidence" toName="audio" perRegion="true" choice="single" showInLine="true" required="true">
+      <Choice value="high confidence"/>
+      <Choice value="medium confidence"/>
+      <Choice value="low confidence"/>
+      <Choice value="false positive"/>
+    </Choices>
+    <TextArea placeholder="Notes for this label" name="notes" toName="audio" editable="true" perRegion="true" required="false" />
+  </View>
+</View>
