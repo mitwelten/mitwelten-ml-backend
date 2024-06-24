@@ -1,0 +1,33 @@
+<!--
+Template for labeling audio files of bird species.
+The labels are dynamically generated from the species list provided in the task.
+
+The task needs to provide an array of species in the following format:
+"species": [
+  {
+    "value": "Turdus viscivorus"
+  },
+  {
+    "value": "Turdus merula"
+  }
+]
+
+Demonstrated in projects:
+- [Verify Birds](https://label.mitwelten.org/projects/25/data?tab=49)
+- [BirdNET paper c >= 0.8](https://label.mitwelten.org/projects/11/data?tab=35)
+-->
+<View>
+  <Filter name="fl" toName="label" hotkey="shift+f" minlength="1" />
+  <Labels name="label" toName="audio" value="$species" showInLine="true" hotkey="ctrl+enter"></Labels>
+  <Audio name="audio" value="$audio" defaultscale="18" height="280" defaultzoom="1" player="webaudio" />
+  <View visibleWhen="region-selected">
+    <Header value="Describe this label" size="6" />
+    <Choices name="confidence" toName="audio" perRegion="true" choice="single" showInLine="true" required="true">
+      <Choice value="high confidence"/>
+      <Choice value="medium confidence"/>
+      <Choice value="low confidence"/>
+      <Choice value="false positive"/>
+    </Choices>
+    <TextArea placeholder="Notes for this label" name="notes" toName="audio" editable="true" perRegion="true" required="false" />
+  </View>
+</View>

@@ -1,0 +1,3 @@
+ground_truth
+label-studio/*.json
+label-studio/labelstudio_config.txt
