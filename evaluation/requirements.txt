@@ -1,0 +1,4 @@
+psycopg2-binary==2.9.10
+tqdm==4.66.5
+minio==7.2.9
+

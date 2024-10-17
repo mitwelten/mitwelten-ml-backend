@@ -54,14 +54,14 @@ python evaluate.py confidences -p 10 -u 5
 #### Mode `labels`
 
 The rectangles from the ground truth data are compared with the rectangles from
-the database. They matched _if they overlap_ by more than 50% (or custom
+the database. They match _if they overlap_ by more than 50% (or custom
 threshold `-tf`, `-tp`) by the IoU (Intersection over Union) metric, and _if
 they have the same class_.
 
 The number of matched rectangles is then compared with the number of rectangles
 in the ground truth data and the number of rectangles in the database, to
 calculate the number of false positives, false negatives, true positives and
-from those nummbers the precision, recall and F1 score.
+from those numbers the precision, recall and F1 score.
 
 #### Mode `confidences`
 
