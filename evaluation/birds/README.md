@@ -1,6 +1,6 @@
 # Evaluation of BirdNET Model
 
-We did not user label-studio to generate ground truth for training our models,
+We did not use label-studio to generate ground truth for training our models,
 the labeling process predated the use of label-studio in our workflow.
 
 We use label-studio to evaluate the performance of our models. For this purpose,
@@ -17,8 +17,8 @@ taxonomy for manually labeling audio files:
 ## Species Filters
 
 Based on the investigetions on the data set in label-studio and based on
-manual cross-checks with other data sources like vogelwart.ch, we created
-filters for the species that may be present in the data set for a set of
+manual cross-checks with other data sources like [vogelwarte.ch](https://vogelwarte.ch), we created
+filters for the species that may be present in the data set for a selection of
 recording locations / deployments:
 
 | deployment id | device label | group |
