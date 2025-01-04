@@ -48,7 +48,7 @@ def query_inferences(selection):
             cur.execute(query, (deployment_id, datetime.strptime(period_start, '%Y-%m-%d %H:%M:%S'), datetime.strptime(period_end, '%Y-%m-%d %H:%M:%S'), tuple(valid_species)))
             results = cur.fetchall()
             # write to file
-            with open(f'data/inferences_{deployment_id}_filtered.csv', 'w') as file:
+            with open(f'export/inferences_{deployment_id}_filtered.csv', 'w') as file:
                 writer = csv.writer(file, delimiter=';')
                 writer.writerow(['species', 'time', 'confidence', 'deployment_id'])
                 writer.writerows(results)
