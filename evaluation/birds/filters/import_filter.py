@@ -56,4 +56,8 @@ def query_inferences(selection):
 if __name__ == '__main__':
     for d in deployments:
         query_inferences((d['id'], d['period_start'], d['period_end'], import_filter(f'data/filter_{d["id"]}.tsv')))
-        break
+
+    # # generate query to create filtered view
+    # for d in deployments:
+    #     species = ','.join([f"'{s[1]}'" for s in import_filter(f'data/filter_{d["id"]}.tsv') if s[0]])
+    #     print(f'''(deployment_id = {d['id']} and time between '{d['period_start']}' and '{d['period_end']}' and species in ({species})) or''')
