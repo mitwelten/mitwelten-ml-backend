@@ -97,7 +97,7 @@ class Runner(object):
             'auto': {
                 'lon': 7.613764385606163, # merian gardens
                 'lat': 47.53774126535403,
-                'auto_season': False,     # use inferrend yearly list
+                'auto_season': False,     # use inferend yearly list
                 'loc_filter_thresh': 0.03
             }}
         return self.store_config(config, 'default configuration')
@@ -250,7 +250,7 @@ def is_readable_dir(arg):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Run and manage BirdNET inferrence queue')
+    parser = argparse.ArgumentParser(description='Run and manage BirdNET inference queue')
 
     p_manage = parser.add_argument_group('Manage Task Queue')
     p_manage.add_argument('--reset-queue', action='store_true', default=False, help='Clear pending and failed tasks')

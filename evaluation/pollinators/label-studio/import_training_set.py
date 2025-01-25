@@ -67,7 +67,7 @@ def main(labelset, output_file):
                                 labels[int(row['class'])]
                             ]
                         },
-                        # "id": row['inferrence_id'],
+                        # "id": row['inference_id'],
                         "from_name": "flower",
                         "to_name": "image",
                         "type": "rectanglelabels",

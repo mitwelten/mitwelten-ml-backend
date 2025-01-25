@@ -44,7 +44,7 @@ def main(csv_file, output_file):
                         row['label']
                     ]
                 },
-                "id": row['inferrence_id'],
+                "id": row['inference_id'],
                 "from_name": "flower" if row['label'] in ['daisy', 'flockenblume', 'wildemoere'] else "pollinator",
                 "to_name": "image",
                 "type": "rectanglelabels",
