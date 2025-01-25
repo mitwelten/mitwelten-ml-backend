@@ -26,4 +26,4 @@ The data is maintained in project-internal google sheets, and have been exported
 
 ## Data export
 
-Using the script `export_filtered_data.py`, the inferrences can be filtered and exported CSV files into [`export`](./export/).
+Using the script `export_filtered_data.py`, the inferences can be filtered and exported CSV files into [`export`](./export/).

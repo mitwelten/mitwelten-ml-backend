@@ -16,6 +16,6 @@ the table structure to reflect all data for the project. It is managed in a
 | configs | BirdNET configuration referred to by the task queue |
 | files | audio files metadata, facilitating import process of existing data |
 | files_image | image files metadata, pollinators |
-| results | BirdNET inferrence results |
+| results | BirdNET inference results |
 | species_occurrence | hand crafted table of species to be observed at merian gardens |
-| tasks | Task queue for BirdNET inferrence job runenr |
+| tasks | Task queue for BirdNET inference job runenr |

@@ -114,7 +114,7 @@ To run the pipeline, select wether to run on GPU with the corresponding flag (`-
 If the flag is absent, the pipeline runs on CPU.
 
 Running on the GPU benefits from a batch size > 1 (set it in [`birdnet/config.py`](./birdnet/config.py)).
-To suppress the verbose inferrence output of tensorflow, set `PBMODEL.predict(sample, verbose=0)` in [`birdnet/model.py`](./birdnet/model.py).
+To suppress the verbose inference output of tensorflow, set `PBMODEL.predict(sample, verbose=0)` in [`birdnet/model.py`](./birdnet/model.py).
 
 To read the input data from storage instead of S3, i.e. NFS, specify the root path with the `--source` option.
 
@@ -135,10 +135,10 @@ python birdnet_pipeline.py --run --tf-gpu --source /mitwelten
 
 - on `add-batch`, tasks are scheduled with file and config ID, state is set to `pending`
 - idle workers pick tasks, task state is set to `running`
-- on inferrence success
+- on inference success
   - results are written to db
   - task state is set to `suceeded`
-- on inferrence failure, state is set to `failed`
+- on inference failure, state is set to `failed`
 - on `reset-failed`, results associated to `failed` tasks are deleted, task state is set to `pending`
 - on `reset-queue`, `pending` and `failed` tasks and associated results are deleted
 
@@ -196,7 +196,7 @@ A few tests on a set of 20 files of 15min length yield the following results:
 Even with 10 tasks running in parallel on CPU it is outperformed by the GPU with
 less than half of total run time (02:19 vs. 00:57).
 This will get slightly worse when running on the smaller filesize (55s), as it
-sums up to 21 batches (with no overlap). Currently the inferrence takes ~330ms.
+sums up to 21 batches (with no overlap). Currently the inference takes ~330ms.
 
 ----
 
