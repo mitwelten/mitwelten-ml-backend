@@ -8,9 +8,9 @@ sudo git clone https://github.com/mitwelten/mitwelten-ml-backend.git /opt/mitwel
 cd /opt/mitwelten-ml-backend
 sudo git submodule update --init --depth 1
 
-# add unprivileged user to run the inferrence service
-sudo adduser --system --group inferrence
-sudo chown -r inferrence:inferrence /opt/mitwelten-ml-backend
+# add unprivileged user to run the inference service
+sudo adduser --system --group inference
+sudo chown -r inference:inference /opt/mitwelten-ml-backend
 
 # create credentials.py
 cd /opt/mitwelten-ml-backend/
@@ -29,10 +29,10 @@ uses the more suitable hardware.
 
 ```bash
 # install dependencies for birdnet pipeline in virtual environment
-cd /opt/mitwelten-ml-backend/inferrence
-sudo -u inferrence python -m venv .venv-birdnet
-sudo -u inferrence /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -U pip'
-sudo -u inferrence /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -r birdnet_pipeline/requirements.txt'
+cd /opt/mitwelten-ml-backend/inference
+sudo -u inference python -m venv .venv-birdnet
+sudo -u inference /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -U pip'
+sudo -u inference /bin/bash -c 'source .venv-birdnet/bin/activate && pip install -r birdnet_pipeline/requirements.txt'
 
 # install and start systemd service unit
 sudo ln -s /opt/mitwelten-ml-backend/inference/services/mitwelten-birdnet-pipeline.service /lib/systemd/system/
@@ -313,10 +313,10 @@ where o.confidence > 0.6
 
 ```bash
 # install dependencies for batnet pipeline in virtual environment
-cd /opt/mitwelten-ml-backend/inferrence
-sudo -u inferrence python -m venv .venv-batnet
-sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -U pip'
-sudo -u inferrence /bin/bash -c 'source .venv-batnet/bin/activate && pip install -r batnet_pipeline/requirements.txt'
+cd /opt/mitwelten-ml-backend/inference
+sudo -u inference python -m venv .venv-batnet
+sudo -u inference /bin/bash -c 'source .venv-batnet/bin/activate && pip install -U pip'
+sudo -u inference /bin/bash -c 'source .venv-batnet/bin/activate && pip install -r batnet_pipeline/requirements.txt'
 
 # install and start systemd service unit
 sudo ln -s /opt/mitwelten-ml-backend/inference/services/mitwelten-batnet-pipeline.service /lib/systemd/system/
